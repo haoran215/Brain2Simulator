@@ -47,7 +47,10 @@ Vreset  =   0*volt     # post-spike reset
 t_ref   =   8*ms       # absolute refractory period
 
 # Synapse
-tau_s   =  10*ms       # double leaky-integration time constant
+Rs       = 10*kohm     # synaptic resistor
+Cs       = 1000*nF     # synaptic capacitance
+tau_s1   =  10*ms      # first leaky-integration time constant = Rs*Cs 
+tau_s2   =  10*ms      # second leaky-integration time constant = Rs*Cs
 Iw_exc  = 150*uA       # excitatory synaptic weight  (Eq. 11 impulse)
 Iw_inh  = 100*uA       # inhibitory synaptic weight
 
