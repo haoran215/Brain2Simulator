@@ -164,5 +164,5 @@ fig.suptitle(
     '— both regimes accessible by design  ✓',
     fontsize=11, fontweight='bold', y=1.01)
 
-plt.savefig('/mnt/user-data/outputs/regime_verification.png', dpi=130, bbox_inches='tight')
+plt.savefig('regime_verification.png', dpi=130, bbox_inches='tight')
 print("Saved.")
