@@ -1,0 +1,153 @@
+{
+  "_comment": "Direction recognition task — 8 directions (0-315 deg, 45 deg bins). Rate coding regime.",
+
+  "simulation": {
+    "dt_ms": 0.1,
+    "seed": 42,
+    "_comment": "0.1ms dt is sufficient for this task (tau_m ~11ms, tau_s=10ms)."
+  },
+
+  "regime": {
+    "tau_s_ms": 10.0,
+    "_comment": "With r_max~100Hz inputs, ISI=10ms = tau_s → boundary/rate regime. Good for reservoir."
+  },
+
+  "neuron_defaults": {
+    "Ra_ohm":      2200,
+    "Rm_hi_ohm": 100000,
+    "Rm_lo_ohm":    100,
+    "Vthresh_V": 4.0,
+
+    "_comment_IF": "I_min=40uA@70Hz, I_max=100uA@200Hz. Solver finds Cm=109.8nF, t_ref=0.33ms.",
+    "I_min_uA":  40.0,
+    "I_max_uA": 100.0,
+    "f_min_Hz":  70.0,
+    "f_max_Hz": 200.0,
+
+    "I_0_uA":    10.0,
+    "tau_s1_ms": 10.0,
+    "tau_s2_ms": 10.0,
+    "network_mode": "Is2",
+    "Iw_exc_uA": 20.0,
+    "Iw_inh_uA": 25.0
+  },
+
+  "populations": [
+    {
+      "id": "dir0",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to   0 deg. Rate set dynamically per trial."
+    },
+    {
+      "id": "dir1",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to  45 deg."
+    },
+    {
+      "id": "dir2",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to  90 deg."
+    },
+    {
+      "id": "dir3",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to 135 deg."
+    },
+    {
+      "id": "dir4",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to 180 deg."
+    },
+    {
+      "id": "dir5",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to 225 deg."
+    },
+    {
+      "id": "dir6",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to 270 deg."
+    },
+    {
+      "id": "dir7",   "n": 1, "type": "poisson", "rate_Hz": 20.0,
+      "_comment": "Input neuron tuned to 315 deg."
+    },
+    {
+      "id": "reservoir",
+      "n": 4,
+      "type": "alif",
+      "_comment": "4 reservoir neurons. Total hardware neurons <= 10 budget.",
+      "neuron_overrides": {
+        "I_0_uA": 8.0,
+        "_comment": "Lower I_0 so neurons are subthreshold without input."
+      }
+    }
+  ],
+
+  "connections": [
+    {
+      "id": "dir0_to_res", "pre": "dir0", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir1_to_res", "pre": "dir1", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir2_to_res", "pre": "dir2", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir3_to_res", "pre": "dir3", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir4_to_res", "pre": "dir4", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir5_to_res", "pre": "dir5", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir6_to_res", "pre": "dir6", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "dir7_to_res", "pre": "dir7", "post": "reservoir",
+      "synapse_type": "exc", "connectivity": "all_to_all", "Iw_uA": 22.0
+    },
+    {
+      "id": "res_rec_exc",
+      "pre": "reservoir", "post": "reservoir",
+      "synapse_type": "exc",
+      "connectivity": "random",
+      "p_connect": 0.6,
+      "allow_self": false,
+      "Iw_uA": 15.0,
+      "_comment": "Recurrent excitation amplifies and mixes input patterns."
+    },
+    {
+      "id": "res_rec_inh",
+      "pre": "reservoir", "post": "reservoir",
+      "synapse_type": "inh",
+      "connectivity": "random",
+      "p_connect": 0.4,
+      "allow_self": false,
+      "Iw_uA": 20.0,
+      "_comment": "Recurrent inhibition prevents runaway excitation."
+    }
+  ],
+
+  "task": {
+    "n_directions": 8,
+    "n_trials": 20,
+    "stim_duration_ms": 150.0,
+    "gap_duration_ms":   50.0,
+    "r_base_Hz":         20.0,
+    "r_mod_Hz":          80.0,
+    "_comment": "Cosine tuning: r_i(theta) = r_base + r_mod * max(0, cos(theta - pref_i))"
+  },
+
+  "learning": {
+    "rule": "reservoir",
+    "readout_population": "reservoir",
+    "n_classes": 8,
+    "readout_window_ms": 130.0,
+    "readout_offset_ms": 20.0,
+    "_comment": "Skip first 20ms (transient), use last 130ms of 150ms stimulus."
+  }
+}
