@@ -210,7 +210,7 @@ fig.suptitle(
     rf'$I_{{hold}}={I_hold_A*1e6:.0f}\,\mu A$',
     fontsize=12, fontweight='bold', y=1.02)
 
-out_path = '/home/haoran/Projects/Brain2simulator/ns_msn_if_sweep.png'
+out_path = 'demo/ns_msn_if_sweep.png'
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 

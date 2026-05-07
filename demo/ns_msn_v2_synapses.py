@@ -292,6 +292,6 @@ fig.suptitle(
     f'mode={NETWORK_MODE}',
     fontsize=12, fontweight='bold', y=0.995)
 
-out_path = '/home/haoran/Projects/Brain2simulator/ns_msn_v2_synapses.png'
+out_path = 'demo/ns_msn_v2_synapses.png'
 plt.savefig(out_path, dpi=110, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")

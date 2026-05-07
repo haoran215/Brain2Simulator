@@ -170,6 +170,6 @@ fig.suptitle(
     f'cued bump propagates locally and dissipates',
     fontsize=12, fontweight='bold', y=1.005)
 
-out_path = '/home/haoran/Projects/Brain2simulator/ns_msn_v4_network.png'
+out_path = 'demo/ns_msn_v4_network.png'
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
