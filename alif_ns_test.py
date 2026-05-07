@@ -58,7 +58,7 @@ f_max_Hz = 200.0     # Hz  — firing rate at I_max  (device-specific!)
 # =============================================================================
 # Circuit parameters  (from thyristor hardware reference)
 # =============================================================================
-Ra_ohm    =  2.2e3   # Ω    axon-hillock resistor  (fitting coef × Ra_actual)
+Ra_ohm    =  50   # Ω    axon-hillock resistor  (fitting coef × Ra_actual)
 Rm_hi_ohm = 100e3    # Ω    memristor HIGH resistance (open switch — quiescent)
 Rm_lo_ohm = 100      # Ω    memristor LOW  resistance (closed switch — spike)
 Vthresh_V =  4.0     # V    spike threshold
@@ -67,7 +67,7 @@ Rs_ohm    =  10e3    # Ω    synaptic leak resistor
 Cs_F      = 1000e-9  # F    synaptic capacitance
 # → tau_s1 = tau_s2 = Rs*Cs = 10 ms
 
-Iw_exc_uA = 20.0     # µA   excitatory synaptic weight
+Iw_exc_uA = 35.0     # µA   excitatory synaptic weight
 Iw_inh_uA = 30.0     # µA   inhibitory synaptic weight
 
 # [DIRECT USER PARAM] Tonic bias current  (no rheobase fraction — set directly)
@@ -75,6 +75,7 @@ Iw_inh_uA = 30.0     # µA   inhibitory synaptic weight
 # I_0 > 0   → shifts neuron closer to threshold; reduces synaptic drive needed
 # I_0 >= I_min → tonic spiking even without synaptic input (oscillator mode)
 I_0_uA    = 15.0     # µA   set to 0 to disable
+
 
 # =============================================================================
 # Analytical solver: find Cm and t_ref from (I_min,f_min) and (I_max,f_max)
@@ -441,6 +442,7 @@ fig.suptitle(
     rf'$I_0={I_0_uA:.1f}\ \mu A$   mode={NETWORK_MODE}',
     fontsize=11, fontweight='bold', y=0.99)
 
-out_path = '/mnt/user-data/outputs/neuron_sim_v5.png'
+out_path = 'alif_ns_test.png'
+
 plt.savefig(out_path, dpi=120)
 print(f"\nFigure saved → {out_path}")
