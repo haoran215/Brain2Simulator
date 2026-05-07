@@ -11,7 +11,7 @@ Side-by-side comparison of three single-neuron models in this repo.
           parallel  ga ∥ gg,  threshold+reset to Vr = IH/ga ≠ 0.
           NO spike shape; refractoriness = tn parameter.
 
-  SET C — MSN         (ns_msn_v1.py — this thread)
+  SET D — MSN         (ns_msn_v1.py — this thread)
           series  Rm+Ra,  HYSTERETIC Rm (state machine Rm_hi ↔ Rm_lo).
           REAL spike shape: Cm discharges through Rm_lo+Ra during closed phase.
           NO t_ref; refractoriness emerges from τ_close = Cm·(Rm_lo+Ra).
@@ -60,16 +60,16 @@ B_taum   = B_C / (B_ga + B_gg)
 B_Irheo  = B_VT * (B_ga + B_gg)
 B_I_drive = B_Irheo * 1.5
 
-# ─── SET C — MSN (paper Fig. 2) ──────────────────────────────────────────────
-C_Cm     = 10e-7
-C_Ra     = 47
-C_Rm_hi  = 100e3
-C_Rm_lo  = 500
-C_Vth    = 1.5
-C_Ihold  = 100e-6
-C_I_drive = 92.4e-6
-C_taum_hi = C_Cm * (C_Rm_hi + C_Ra)
-C_taum_lo = C_Cm * (C_Rm_lo + C_Ra)
+# ─── SET D — MSN (paper Fig. 2) ──────────────────────────────────────────────
+D_Cm     = 10e-6
+D_Ra     = 47
+D_Rm_hi  = 100e3
+D_Rm_lo  = 500
+D_Vth    = 0.9
+D_Ihold  = 100e-6
+D_I_drive = 92.4e-6
+D_taum_hi = D_Cm * (D_Rm_hi + D_Ra)
+D_taum_lo = D_Cm * (D_Rm_lo + D_Ra)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ Simulations                                                             ║
@@ -112,13 +112,13 @@ def sim_thyristor():
 def sim_MSN():
     start_scope()
     defaultclock.dt = 1*us
-    Cm     = C_Cm    * farad
-    Ra     = C_Ra    * ohm
-    Rm_hi  = C_Rm_hi * ohm
-    Rm_lo  = C_Rm_lo * ohm
-    Vth_q  = C_Vth   * volt
-    Ihold_q = C_Ihold * amp
-    Iin_q  = C_I_drive * amp
+    Cm     = D_Cm    * farad
+    Ra     = D_Ra    * ohm
+    Rm_hi  = D_Rm_hi * ohm
+    Rm_lo  = D_Rm_lo * ohm
+    Vth_q  = D_Vth   * volt
+    Ihold_q = D_Ihold * amp
+    Iin_q  = D_I_drive * amp
     eqs = '''
     dVm/dt = (Iin_q - Vm/(Rm_S + Ra)) / Cm   : volt
     Rm_S   = (1 - s)*Rm_hi + s*Rm_lo          : ohm
@@ -150,9 +150,9 @@ print("Simulating SET B (Thyristor) …")
 B_t, B_Vm, B_sp = sim_thyristor()
 print(f"  {len(B_sp)} spikes in 800 ms  →  {len(B_sp)/0.800:.1f} Hz")
 
-print("Simulating SET C (MSN) …")
-C_t, C_Vm, C_Vout, C_sp = sim_MSN()
-print(f"  {len(C_sp)} spikes in 300 ms  →  {len(C_sp)/0.300:.1f} Hz")
+print("Simulating SET D (MSN) …")
+D_t, D_Vm, D_Vout, D_sp = sim_MSN()
+print(f"  {len(D_sp)} spikes in 300 ms  →  {len(D_sp)/0.300:.1f} Hz")
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ I-F curves (analytical)                                                 ║
@@ -177,33 +177,33 @@ def IF_thyristor(I_arr):
 
 def IF_MSN(I_arr):
     f = np.zeros_like(I_arr)
-    R_o = C_Rm_hi + C_Ra
-    R_c = C_Rm_lo + C_Ra
-    tau_o = C_Cm * R_o
-    tau_c = C_Cm * R_c
-    Vreop = C_Ihold * R_c
+    R_o = D_Rm_hi + D_Ra
+    R_c = D_Rm_lo + D_Ra
+    tau_o = D_Cm * R_o
+    tau_c = D_Cm * R_c
+    Vreop = D_Ihold * R_c
     for k, I in enumerate(I_arr):
         Vss_o = I*R_o
         Vss_c = I*R_c
-        if Vss_o <= C_Vth or I >= C_Ihold: continue
-        t_o = -tau_o * np.log(1 - C_Vth/Vss_o)
-        t_c = -tau_c * np.log((Vreop - Vss_c)/(C_Vth - Vss_c))
+        if Vss_o <= D_Vth or I >= D_Ihold: continue
+        t_o = -tau_o * np.log(1 - D_Vth/Vss_o)
+        t_c = -tau_c * np.log((Vreop - Vss_c)/(D_Vth - Vss_c))
         f[k] = 1.0/(t_o + t_c)
     return f
 
 A_Isweep = np.linspace(0, 160e-6, 1500)
 B_Isweep = np.linspace(0, 8e-3,   1500)
-C_Isweep = np.linspace(0, 110e-6, 1500)
+D_Isweep = np.linspace(0, 110e-6, 1500)
 A_f = IF_aLIF(A_Isweep)
 B_f = IF_thyristor(B_Isweep)
-C_f = IF_MSN(C_Isweep)
+D_f = IF_MSN(D_Isweep)
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ Plot                                                                    ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 C_A = '#2980B9'   # aLIF blue
 C_B = '#E74C3C'   # thyristor red
-C_C = '#16A085'   # MSN teal
+C_D = '#16A085'   # MSN teal
 
 fig = plt.figure(figsize=(20, 13))
 gs  = gridspec.GridSpec(3, 3, figure=fig, hspace=0.55, wspace=0.32,
@@ -215,8 +215,8 @@ for col, (t, Vm, sp, c, name, vth, vr, drive_label) in enumerate([
      A_Vth, A_Vr,  f'I = {A_I_drive*1e6:.0f} µA'),
     (B_t, B_Vm, B_sp, C_B, 'SET B — Thyristor',
      B_VT, B_Vr,  f'I = {B_I_drive*1e3:.2f} mA'),
-    (C_t, C_Vm, C_sp, C_C, 'SET C — MSN (new)',
-     C_Vth, None, f'I = {C_I_drive*1e6:.1f} µA'),
+    (D_t, D_Vm, D_sp, C_D, 'SET D — MSN (new)',
+     D_Vth, None, f'I = {D_I_drive*1e6:.1f} µA'),
 ]):
     ax = fig.add_subplot(gs[0, col])
     ax.plot(t, Vm, color=c, lw=0.8)
@@ -258,14 +258,14 @@ ax.set_title('Thyristor — reset to Vr=IH/ga\n(no waveform; non-zero reset)',
 ax.set_xlabel('t − t_spike (ms)'); ax.set_ylabel('Vm (V)')
 ax.legend(fontsize=8)
 
-# SET C — REAL spike: show Vout (paper Fig. 2 right inset)
+# SET D — REAL spike: show Vout (paper Fig. 2 right inset)
 ax = fig.add_subplot(gs[1, 2])
-if len(C_sp):
-    tz, yz = zoom_around(C_t, C_Vout*1e3, C_sp[0], 1, 30)
-    ax.plot(tz, yz, color=C_C, lw=1.8, label='Vout (paper trace)')
+if len(D_sp):
+    tz, yz = zoom_around(D_t, D_Vout*1e3, D_sp[0], 1, 30)
+    ax.plot(tz, yz, color=C_D, lw=1.8, label='Vout (paper trace)')
 ax.axvline(0, color='k', ls=':', lw=1, label='close event')
 ax.set_title('MSN — REAL spike waveform (Vout)\nemerges from Cm·(Rm_lo+Ra) discharge',
-             fontsize=9, fontweight='bold', color=C_C)
+             fontsize=9, fontweight='bold', color=C_D)
 ax.set_xlabel('t − t_spike (ms)'); ax.set_ylabel('Vout (mV)')
 ax.legend(fontsize=8, loc='upper right')
 
@@ -285,19 +285,19 @@ ax.plot(B_Isweep*1e3, B_f, color=C_B, lw=2.2)
 ax.fill_between(B_Isweep*1e3, B_f, alpha=0.15, color=C_B)
 ax.axhline(1/B_tn, color=C_B, ls=':', lw=1,
            label=f'f_max=1/tn={1/B_tn:.1f} Hz')
-ax.set_xlabel('I (mA)'); ax.set_ylabel('0.9 (Hz)')
+ax.set_xlabel('I (mA)'); ax.set_ylabel('f (Hz)')
 ax.set_title(f'Thyristor I-F   (tn={B_tn*1e3:.0f} ms)',
              fontsize=10, fontweight='bold', color=C_B)
 ax.legend(fontsize=8); ax.grid(alpha=0.25)
 
 ax = fig.add_subplot(gs[2, 2])
-ax.plot(C_Isweep*1e6, C_f, color=C_C, lw=2.2)
-ax.fill_between(C_Isweep*1e6, C_f, alpha=0.15, color=C_C)
-ax.axvline(C_Ihold*1e6, color='red', ls=':', lw=1,
-           label=f'I_hold={C_Ihold*1e6:.0f} µA (depol block)')
+ax.plot(D_Isweep*1e6, D_f, color=C_D, lw=2.2)
+ax.fill_between(D_Isweep*1e6, D_f, alpha=0.15, color=C_D)
+ax.axvline(D_Ihold*1e6, color='red', ls=':', lw=1,
+           label=f'I_hold={D_Ihold*1e6:.0f} µA (depol block)')
 ax.set_xlabel('I (µA)'); ax.set_ylabel('f (Hz)')
 ax.set_title('MSN I-F   (no t_ref; emerges from τ_close)',
-             fontsize=10, fontweight='bold', color=C_C)
+             fontsize=10, fontweight='bold', color=C_D)
 ax.legend(fontsize=8); ax.grid(alpha=0.25)
 
 # ─── Suptitle / annotation table ────────────────────────────────────────────
@@ -308,7 +308,7 @@ fig.suptitle(
     'MSN replaces the reset rule with explicit Rm hysteresis → real spike waveform.',
     fontsize=12, fontweight='bold', y=1.005)
 
-out_path = 'ns_msn_compare.png'
+out_path = '/home/haoran/Projects/Brain2simulator/ns_msn_compare.png'
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 
@@ -326,14 +326,14 @@ rows = [
     ("Spike shape",    "none",                "none",                  "real (paper Fig. 2)"),
     ("Refractory",     f"t_ref={A_tref*1e3:.0f} ms (param)",
                        f"tn={B_tn*1e3:.0f} ms (param)",
-                       f"τ_close={C_taum_lo*1e3:.2f} ms (emergent)"),
+                       f"τ_close={D_taum_lo*1e3:.2f} ms (emergent)"),
     ("Cm",             f"{A_Cm*1e9:.1f} nF",
                        f"{B_C*1e9:.0f} nF",
-                       f"{C_Cm*1e6:.0f} µF"),
+                       f"{D_Cm*1e6:.0f} µF"),
     ("Time scale",     "ms",                  "ms",                    "ms (paper Fig. 2)"),
     ("Source file",    "modelcopare.py",      "modelcopare.py",        "ns_msn_v1.py"),
 ]
-print(f"  {'':<22}{'SET A — aLIF':<24}{'SET B — Thyristor':<25}{'SET C — MSN'}")
+print(f"  {'':<22}{'SET A — aLIF':<24}{'SET B — Thyristor':<25}{'SET D — MSN'}")
 print("-"*78)
 for r in rows:
     print(f"  {r[0]:<22}{r[1]:<24}{r[2]:<25}{r[3]}")
