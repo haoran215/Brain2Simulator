@@ -1,0 +1,105 @@
+{
+  "_comment": "Memristor aLIF SNN — default configuration template",
+
+  "simulation": {
+    "dt_ms": 0.05,
+    "seed": 42,
+    "_comment": "dt_ms: integration timestep. 0.05ms is safe for tau_m~4ms."
+  },
+
+  "regime": {
+    "tau_s_ms": 10.0,
+    "_comment": "Crossover frequency = 1000/tau_s_ms = 100 Hz. f > 100Hz = rate, f < 100Hz = temporal."
+  },
+
+  "neuron_defaults": {
+    "_comment_topology": "SERIES topology: Vm drives current through (Rm_S + Ra) voltage divider",
+    "Ra_ohm":      2200,
+    "Rm_hi_ohm": 100000,
+    "Rm_lo_ohm":    100,
+
+    "_comment_threshold": "Vthresh_V = 4V. Hardware value from thyristor gate threshold.",
+    "Vthresh_V": 4.0,
+
+    "_comment_IF": "I_min/I_max are MEASURED operating points on your device. Cm and t_ref are SOLVED.",
+    "I_min_uA":  40.0,
+    "I_max_uA": 100.0,
+    "f_min_Hz":  70.0,
+    "f_max_Hz": 200.0,
+
+    "_comment_bias": "I_0_uA: tonic bias. 0 = silent without input. >0 = shifts closer to threshold.",
+    "I_0_uA": 15.0,
+
+    "_comment_synapse": "tau_s1_ms = tau_s2_ms = Rs*Cs. Equal = alpha function (NMDA-like). tau_s1 < tau_s2 = AMPA.",
+    "tau_s1_ms": 10.0,
+    "tau_s2_ms": 10.0,
+
+    "_comment_mode": "network_mode: 'Is2' = alpha fn drives Vm (recurrent/NMDA). 'Is1' = exp drives Vm (feedforward/AMPA).",
+    "network_mode": "Is2",
+
+    "_comment_weight": "Default synaptic weights. Override per-connection in 'connections'.",
+    "Iw_exc_uA": 20.0,
+    "Iw_inh_uA": 30.0
+  },
+
+  "populations": [
+    {
+      "id": "input",
+      "n": 8,
+      "type": "poisson",
+      "rate_Hz": 70.0,
+      "_comment": "Poisson input generators. rate_Hz can be changed dynamically with set_poisson_rate()."
+    },
+    {
+      "id": "reservoir",
+      "n": 10,
+      "type": "alif",
+      "_comment": "aLIF neurons. neuron_overrides overrides any neuron_defaults key for this population.",
+      "neuron_overrides": {
+        "I_0_uA": 15.0
+      }
+    }
+  ],
+
+  "connections": [
+    {
+      "id": "inp_to_res",
+      "pre": "input",
+      "post": "reservoir",
+      "synapse_type": "exc",
+      "connectivity": "all_to_all",
+      "Iw_uA": 20.0,
+      "_comment": "Every input neuron connects to every reservoir neuron."
+    },
+    {
+      "id": "res_to_res",
+      "pre": "reservoir",
+      "post": "reservoir",
+      "synapse_type": "exc",
+      "connectivity": "random",
+      "p_connect": 0.5,
+      "allow_self": false,
+      "Iw_uA": 12.0,
+      "_comment": "Sparse recurrent excitation. p_connect=0.5 means ~50% chance of each pair connecting."
+    },
+    {
+      "id": "res_inh",
+      "pre": "reservoir",
+      "post": "reservoir",
+      "synapse_type": "inh",
+      "connectivity": "random",
+      "p_connect": 0.3,
+      "allow_self": false,
+      "Iw_uA": 25.0,
+      "_comment": "Sparse recurrent inhibition for E/I balance."
+    }
+  ],
+
+  "_comment_learning": "See direction_task.json for a complete task with learning config.",
+  "learning": {
+    "rule": "reservoir",
+    "readout_population": "reservoir",
+    "n_classes": 2,
+    "readout_window_ms": 150.0
+  }
+}
