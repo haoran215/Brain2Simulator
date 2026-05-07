@@ -25,7 +25,7 @@ Key tuning ratio (see msn_lib.py §6):
       LARGER  → persistent firing (latched)
       SMALLER → bump fades (this file targets here, slightly subcritical)
 """
-
+#%%
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -163,7 +163,9 @@ ax.set_ylim(-0.1, 1.1)
 fig.suptitle(
     'MSN single-neuron bump test (msn_lib demo)  —  pulse triggers self-excit. burst',
     fontsize=12, fontweight='bold', y=1.005)
-
+plt.show()
 out_path = '/home/haoran/Projects/Brain2simulator/ns_msn_v3_bump.png'
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
+
+# %%
