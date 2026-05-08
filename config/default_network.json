@@ -21,11 +21,11 @@
     "_comment_threshold": "Vthresh_V = 4V. Hardware value from thyristor gate threshold.",
     "Vthresh_V": 4.0,
 
-    "_comment_IF": "I_min/I_max are MEASURED operating points on your device. Cm and t_ref are SOLVED.",
+    "_comment_IF": "I_min/I_max are MEASURED operating points on your device. Cm and t_ref are SOLVED. With Vth=4V, Rm=100kΩ, Ra=2.2kΩ, I_0=15µA: B/A=0.334 (feasibility metric). Targets must satisfy f_min/f_max > B/A. The defaults below give f_min/f_max=0.5, well above the boundary, so t_ref ≈ 5 ms (sane) and the asymptote 1/t_ref ≈ 200 Hz sits ~2× f_max. Earlier defaults 70/200 Hz sat right on the boundary (0.35 vs 0.334), squeezing t_ref to 0.33 ms and inflating 1/t_ref to ~3 kHz — visually scary but mathematically fine.",
     "I_min_uA":  40.0,
     "I_max_uA": 100.0,
-    "f_min_Hz":  70.0,
-    "f_max_Hz": 200.0,
+    "f_min_Hz":  50.0,
+    "f_max_Hz": 100.0,
 
     "_comment_bias": "I_0_uA: tonic bias. 0 = silent without input. >0 = shifts closer to threshold.",
     "I_0_uA": 15.0,

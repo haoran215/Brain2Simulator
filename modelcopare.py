@@ -452,6 +452,6 @@ fig.suptitle(
     'Red = SET B (thyristor fit, parallel topology, Vr=IH/ga≠0)',
     fontsize=12, fontweight='bold', y=1.002)
 
-out_path = 'model_comparison.png'
+out_path = 'output/model_comparison.png'
 plt.savefig(out_path, dpi=150, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")

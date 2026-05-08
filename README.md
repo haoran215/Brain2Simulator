@@ -6,18 +6,22 @@ A Brian2-based spiking neural network (SNN) simulator for memristor-coupled adap
 
 ```
 Brain2simulator/
-├── modules/                    # Core simulator library
-│   ├── neuron.py               # NeuronPopulation — aLIF model + monitors
-│   ├── synapse.py              # SynapseConnection — Brian2 synapses
-│   ├── network.py              # SNNNetwork — assembles from JSON config
-│   ├── learning.py             # ReservoirReadout, build_stdp_synapses
-│   └── regime.py               # RegimeDetector — rate vs temporal coding
+├── modules/                       # Core simulator library
+│   ├── neuron.py                  # NeuronPopulation — aLIF model + I-F solver
+│   ├── synapse.py                 # SynapseConnection — Brian2 synapses
+│   ├── network.py                 # SNNNetwork — assembles from JSON config
+│   ├── learning.py                # ReservoirReadout, build_stdp_synapses
+│   └── regime.py                  # RegimeDetector — rate vs temporal coding
 ├── config/
-│   ├── direction_task.json     # 8-direction recognition task config
-│   └── default_network.json   # Minimal template to start from
+│   ├── direction_task.json        # 8-direction recognition task config
+│   └── default_network.json       # Minimal template to start from
 ├── tasks/
-│   └── direction_recognition.py  # End-to-end direction recognition task
-└── run_demo.py                 # Entry point
+│   └── direction_recognition.py   # End-to-end direction recognition task
+├── aLIF_model.py                  # Standalone aLIF reference (inline math)
+├── modelcopare.py                 # aLIF vs Thyristor parameter comparison
+├── regime_verify.py               # Rate / temporal regime sanity check
+├── Spikesynapsechar.py            # Synapse characterisation utility
+└── demo_direction.py              # Entry point (run the direction task)
 ```
 
 ## Installation
@@ -33,10 +37,24 @@ pip install brian2 scikit-learn numpy matplotlib
 ## Quick start
 
 ```bash
-python run_demo.py --task direction
+python demo_direction.py --task direction
 ```
 
 This runs the 8-direction recognition task and saves a results plot to `direction_recognition.png`.
+
+---
+
+## Standalone reference scripts
+
+For pedagogy and debugging, several files run independently of the modular pipeline:
+
+| File | What it does |
+|------|--------------|
+| [aLIF_model.py](aLIF_model.py) | Inline aLIF + Is1/Is2 cascade synapses + I-F target solver. Same math as `modules/neuron.py` but visible end-to-end. Run it to inspect the I-F curve, Vm traces, and synaptic currents at a fixed parameter set. |
+| [modelcopare.py](modelcopare.py) | Side-by-side comparison of the abstract aLIF model and the thyristor-hardware model (parallel `gₐ ∥ g_g` topology, non-zero reset, etc.). |
+| [regime_verify.py](regime_verify.py) | Numerically verifies the rate-vs-temporal coding crossover at `f = 1/τ_s`. |
+
+`aLIF_model.py` is the script to read first if you want to understand the solver. It prints the same diagnostic block that `NeuronPopulation.summary()` prints, so the inline numbers and the modular numbers always match.
 
 ---
 
@@ -69,14 +87,14 @@ These apply to **all** aLIF populations unless overridden by `neuron_overrides`.
   "Vthresh_V":     4.0,
   "I_min_uA":     40.0,
   "I_max_uA":    100.0,
-  "f_min_Hz":     70.0,
-  "f_max_Hz":    200.0,
-  "I_0_uA":       10.0,
+  "f_min_Hz":     50.0,
+  "f_max_Hz":    100.0,
+  "I_0_uA":       15.0,
   "tau_s1_ms":    10.0,
   "tau_s2_ms":    10.0,
   "network_mode": "Is2",
   "Iw_exc_uA":    20.0,
-  "Iw_inh_uA":    25.0
+  "Iw_inh_uA":    30.0
 }
 ```
 
@@ -87,20 +105,22 @@ These apply to **all** aLIF populations unless overridden by `neuron_overrides`.
 | `Vthresh_V` | V | Spike threshold voltage |
 | `I_min_uA` | µA | **Measured** drive current that produces `f_min_Hz` |
 | `I_max_uA` | µA | **Measured** drive current that produces `f_max_Hz` |
-| `f_min_Hz` | Hz | Minimum firing rate at `I_min` — used to **solve** Cm and t_ref |
-| `f_max_Hz` | Hz | Maximum firing rate at `I_max` |
+| `f_min_Hz` | Hz | Firing rate at `I_min` — used to **solve** Cm and t_ref |
+| `f_max_Hz` | Hz | Firing rate at `I_max` |
 | `I_0_uA` | µA | Tonic bias current. 0 = silent without input; >0 = closer to threshold |
 | `tau_s1_ms` | ms | Synaptic rise time constant (Is1, exponential kernel) |
-| `tau_s2_ms` | ms | Synaptic decay time constant (Is2, alpha kernel) |
-| `network_mode` | — | `"Is2"` (alpha fn drives Vm, NMDA-like) or `"Is1"` (exp drives Vm, AMPA-like) |
-| `Iw_exc_uA` | µA | Default excitatory weight (can be overridden per connection) |
+| `tau_s2_ms` | ms | Synaptic decay time constant (Is2, alpha kernel when `tau_s1 = tau_s2`) |
+| `network_mode` | — | `"Is2"` (alpha drives Vm, NMDA-like) or `"Is1"` (exp drives Vm, AMPA-like) |
+| `Iw_exc_uA` | µA | Default excitatory weight (overridable per connection) |
 | `Iw_inh_uA` | µA | Default inhibitory weight |
 
-**Important:** `Cm` (membrane capacitance) and `t_ref` (refractory period) are **solved automatically** from `I_min/f_min` and `I_max/f_max`. You never set them directly — you set the hardware operating points and the solver finds the biophysical parameters.
+**Important:** `Cm` (membrane capacitance) and `t_ref` (refractory period) are **solved automatically** from the four `(I, f)` operating points. You never set them directly — you set the hardware operating points and the solver finds the biophysical parameters.
+
+The fields `tau_m_ms`, `Cm_nF`, `t_ref_ms`, `f_at_Imax_Hz`, `f_asymp_Hz`, and `B_over_A` are **outputs** of the solver and appear on the population's `params` dict after construction.
 
 ### 3. `populations` — define neuron groups
 
-Each entry in the list creates one population.
+Each entry creates one population.
 
 #### Poisson input population
 
@@ -117,7 +137,7 @@ Each entry in the list creates one population.
 |-------|---------|
 | `id` | Unique name (used in connections and `set_poisson_rate()`) |
 | `n` | Number of neurons |
-| `type` | `"poisson"` — fires at independent Poisson-distributed spike times |
+| `type` | `"poisson"` — independent Poisson-distributed spike times |
 | `rate_Hz` | Default firing rate. Change per-trial with `snn.set_poisson_rate(id, hz)` |
 
 #### aLIF reservoir population
@@ -174,10 +194,74 @@ Each entry in the list creates one population.
 
 ---
 
+## Tuning the I-F targets — feasibility and "rationality"
+
+The solver in `modules/neuron.py` finds `(τ_m, t_ref)` from two operating points using the LIF formula
+
+```
+f(I) = 1 / [ -τ_m · ln(1 - V_th / V_ss(I)) + t_ref ]
+       with  V_ss(I) = (I + I_0)·(R_m^hi + R_a)
+```
+
+Two derived shape parameters control feasibility:
+
+```
+A = -ln(1 - V_th / V_ss(I_min))   # curve shape near rheobase
+B = -ln(1 - V_th / V_ss(I_max))   # curve shape at upper bound
+```
+
+### Feasibility condition
+
+Targets are physically realisable iff
+
+```
+B / A   <   f_min / f_max
+```
+
+At equality the solver returns `t_ref = 0` (and the asymptote `1/t_ref → ∞`). The further `f_min/f_max` sits **above** `B/A`, the larger the solved `t_ref` and the smaller the asymptote — i.e. parameters are more "rational".
+
+`solve_neuron_params` raises with a diagnostic if the targets violate this; the reported `B_over_A` field lets you see how much margin you have.
+
+### What to watch in the printout
+
+When you call `pop.summary()`, two firing-rate quantities are printed — they are easy to confuse:
+
+| Field | Meaning |
+|-------|---------|
+| `f at I_max` | The firing rate at the **operating** upper bound. Equals `f_max_Hz` by construction. This is what the neuron actually does. |
+| `1/t_ref` (`f_asymp_Hz`) | The **asymptote** of the I-F curve as `I → ∞`. Not an operational rate — the neuron never sees enough current to reach it. |
+
+Rule of thumb:
+
+```
+asymptote / f_max  ≈  1.5–3 ×    →  rational set, t_ref is in the ms range
+asymptote / f_max  ≥  10 ×       →  targets sit at the feasibility edge,
+                                    t_ref is squeezed to ~µs (cosmetically
+                                    alarming but mathematically fine)
+```
+
+### Concrete example: the new defaults
+
+`config/default_network.json` ships with `f_min/f_max = 50/100 Hz` over `40/100 µA`, with `Vth = 4 V`, `R_m^hi + R_a = 102 kΩ`, `I_0 = 15 µA`. The solver reports:
+
+```
+B/A           = 0.335    (feasibility metric)
+f_min/f_max   = 0.500    (well above 0.335 — comfortable margin)
+Cm            = 118 nF
+t_ref         = 4.97 ms
+f at I_max    = 100 Hz   (operational)
+1/t_ref       = 201 Hz   (asymptote, 2.0 × f_max — rational)
+```
+
+For comparison, the previous defaults `70/200 Hz` had `f_min/f_max = 0.35`, only barely above `B/A = 0.334`, which produced `t_ref = 0.33 ms` and an asymptote of `~3 kHz`. That number was alarming but mathematically valid — the neuron still fires at 70 Hz and 200 Hz at the calibration points; the asymptote is just where the I-F curve would go if you drove the neuron with `I → ∞`.
+
+---
+
 ## Using SNNNetwork in Python
 
 ```python
 from modules.network import SNNNetwork
+from brian2 import second
 
 snn = SNNNetwork('config/direction_task.json')
 snn.summary()
@@ -196,8 +280,10 @@ spike_i, spike_t = snn.get_spikes('reservoir')
 # spike_i: neuron index array
 # spike_t: spike time array (seconds)
 
-# Access population metadata
-n_res = snn.populations['reservoir'].n
+# Access population metadata and solved parameters
+n_res     = snn.populations['reservoir'].n
+solved    = snn.populations['reservoir'].params
+print(solved['Cm_nF'], solved['t_ref_ms'], solved['f_asymp_Hz'])
 ```
 
 ---
@@ -261,7 +347,7 @@ cm        = readout.confusion_matrix(X_test, y_test)
 ### Step 5 — Run it
 
 ```bash
-python run_demo.py --task direction
+python demo_direction.py --task direction
 ```
 
 Expected output:
@@ -290,6 +376,7 @@ The plot shows tuning curves (A), spike rasters (B), feature heatmap (C), PCA of
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from brian2          import second
 from modules.network  import SNNNetwork
 from modules.learning import ReservoirReadout
 
@@ -313,10 +400,29 @@ def run_my_task(config_path, plot_path):
     print(f"Test accuracy: {readout.score(X_test, y_test)*100:.1f}%")
 ```
 
-3. Add your task to `run_demo.py`:
+3. Add your task to `demo_direction.py`:
 
 ```python
 elif task == 'my_task':
     from tasks.my_task import run_my_task
     run_my_task(os.path.join('config', 'my_task.json'), 'my_task_results.png')
+```
+
+---
+
+## Troubleshooting
+
+**Solver raises "Infeasible targets"**: the chosen `(I_min, I_max, f_min, f_max)` violate `B/A < f_min/f_max`. The error message names the four knobs that fix it:
+
+- raise `f_min_Hz` (closer to `f_max_Hz`),
+- lower `f_max_Hz`,
+- lower `R_total = R_m^hi + R_a` so `V_th` is a bigger fraction of `V_ss`,
+- lower `I_0_uA` (same effect).
+
+**`1/t_ref` is huge (≥ 10× f_max)**: targets are at the feasibility edge. `t_ref` is squeezed to ~µs. Mathematically valid but cosmetically alarming. Increase `f_min_Hz` toward `f_max_Hz` to push targets further into the feasible region.
+
+**Vm doesn't cross threshold even with strong synaptic input**: `V_ss(I_total) ≤ V_th`. Either `I_total = I_syn + I_0` is below rheobase `V_th / R_total`, or your input rate is too low for `I_syn` to integrate above threshold. Compute the rheobase explicitly:
+
+```python
+I_rheo_uA = (cfg['Vthresh_V'] / (cfg['Ra_ohm'] + cfg['Rm_hi_ohm'])) * 1e6
 ```

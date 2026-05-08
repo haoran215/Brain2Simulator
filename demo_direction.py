@@ -1,10 +1,10 @@
 """
-run_demo.py  —  Entry point for all tasks
+demo_direction.py  —  Entry point for all tasks
 
 Usage
 -----
-  python run_demo.py               # runs direction recognition (default)
-  python run_demo.py --task direction
+  python demo_direction.py               # runs direction recognition (default)
+  python demo_direction.py --task direction
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
