@@ -1,6 +1,6 @@
 """
-ns_msn_compare.py
-=================
+alif_thy_msn_compare.py
+=======================
 Side-by-side comparison of three single-neuron models in this repo.
 
   SET A — aLIF        (modelcopare.py SET A)
@@ -308,7 +308,7 @@ fig.suptitle(
     'MSN replaces the reset rule with explicit Rm hysteresis → real spike waveform.',
     fontsize=12, fontweight='bold', y=1.005)
 
-out_path = 'ns_msn_compare.png'
+out_path = 'alif_thy_msn_compare.png'
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 

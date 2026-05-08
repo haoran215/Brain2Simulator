@@ -449,6 +449,6 @@ fig.suptitle(
     rf'$t_{{ref}}={t_ref/ms:.0f}$ ms',
     fontsize=11, fontweight='bold', y=1.005)
 
-out_path = 'spike_synapse_characterisation.png'
+out_path = 'alif_Spikesynapsechar.png'
 plt.savefig(out_path, dpi=150, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
