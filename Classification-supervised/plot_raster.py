@@ -216,7 +216,7 @@ def plot(X, y, spike_data, group_counts, args, params):  # noqa: ARG001
         ax_img.text(x0, 32, f'{y[k]}', ha='center', va='top', fontsize=10)
 
     fig.suptitle(
-        f'MSN raster — 100 neurons (10×10 per class)   '
+        f'MSN raster — 200 neurons (10×20 per class)   '
         f'T={T_ms:.0f} ms,  λ_max={args.lambda_max:.0f} Hz,  '
         f'τ_s={args.tau_s*1e3:.0f} ms,  '
         f'w_scale={args.weight_scale*1e9:.0f} nA/unit',

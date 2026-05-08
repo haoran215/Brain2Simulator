@@ -9,7 +9,7 @@ out by majority spike count over a 10-neuron group.
 ```
               train_pytorch.py            eval_msn_brian2.py / plot_raster.py
             ┌──────────────────┐         ┌─────────────────────────────────┐
-  MNIST ──▶ │ rate proxy SNN   │ ──W──▶  │ 784 Poisson → 100 MSN (Brian2) │
+  MNIST ──▶ │ rate proxy SNN   │ ──W──▶ │ 784 Poisson → 100 MSN (Brian2)  │
             │ F_MAX·sigmoid(I) │         │ argmax over 10 group spike sums │
             └──────────────────┘         └─────────────────────────────────┘
 ```

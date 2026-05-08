@@ -1,15 +1,15 @@
 """
 eval_msn_brian2.py
 ==================
-Evaluate the trained 784→100 weight matrix on MNIST in the *real* Brian2
+Evaluate the trained 784→200 weight matrix on MNIST in the *real* Brian2
 MSN simulator. Each test image is presented for T seconds; pixels drive
-784 Poisson sources whose spikes feed 100 MSN neurons via signed synapses
-(positive weights → Is1_exc, negative → Is1_inh). The 100 outputs are
-partitioned into 10 groups of 10; the group with the highest spike count
+784 Poisson sources whose spikes feed 200 MSN neurons via signed synapses
+(positive weights → Is1_exc, negative → Is1_inh). The 200 outputs are
+partitioned into 10 groups of 20; the group with the highest spike count
 wins.
 
 This is the rate-regime classification experiment requested:
-    - 100 MSN neurons, partitioned 10 × 10 (one group per digit)
+    - 200 MSN neurons, partitioned 10 × 10 (one group per digit)
     - Synaptic weights transferred from a PyTorch surrogate model
     - Predict by argmax of group spike count over T_present
 
@@ -117,8 +117,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[2])
     ap.add_argument('--weights',      default='Classification/weights.npz')
     ap.add_argument('--data',         default='Classification/data')
-    ap.add_argument('--n',            type=int,   default=200,
-                    help='number of test images (default 200; full set is 10000)')
+    ap.add_argument('--n',            type=int,   default=500,
+                    help='number of test images (default 500; full set is 10000)')
     ap.add_argument('--T',            type=float, default=0.5,
                     help='presentation time per image, in seconds')
     ap.add_argument('--lambda_max',   type=float, default=200.0,
@@ -252,7 +252,7 @@ def plot_results(y, preds, rates, args, acc, ann_acc, params):
     fig.colorbar(im, ax=ax, fraction=0.045, label='Hz')
 
     fig.suptitle(
-        f'MSN rate-regime classifier — 100 neurons (10 × 10 per class)   '
+        f'MSN rate-regime classifier — 200 neurons (10 × 20 per class)   '
         f'τ_s={args.tau_s*1e3:.0f} ms, T={args.T*1e3:.0f} ms, '
         f'λ_max={args.lambda_max:.0f} Hz, '
         f'w_scale={args.weight_scale*1e9:.0f} nA/unit   '

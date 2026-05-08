@@ -4,11 +4,11 @@ train_pytorch.py
 Train a rate-regime SNN proxy on MNIST and save weights for transfer to the
 Brian2 MSN evaluator.
 
-Architecture (matches the 100-neuron rate-coded MSN classifier):
+Architecture (matches the 200-neuron rate-coded MSN classifier):
 
-    784 input "rates"  ──[ W (100x784) ]──>  100 hidden "rates"
+    784 input "rates"  ──[ W (200x784) ]──>  200 hidden "rates"
                                               │
-                                              ▼  partition into 10 groups of 10
+                                              ▼  partition into 10 groups of 20
                                             (group-mean rate per class)
                                               │
                                               ▼  argmax → predicted digit
@@ -25,7 +25,7 @@ the *group-mean rate* readout — exactly what the Brian2 simulator counts.
 Output
 ------
 Classification/weights.npz with keys:
-    W           (100, 784)  float32 — synaptic weight matrix (signed)
+    W           (200, 784)  float32 — synaptic weight matrix (signed)
     F_MAX                    float  — Hz, used for rate-to-current conversion
     train_acc, test_acc      float  — sanity check on transfer ceiling
 """
@@ -45,9 +45,9 @@ from torchvision import datasets, transforms
 
 
 N_PIX        = 28 * 28
-N_HID        = 100
+N_HID        = 200
 N_CLASSES    = 10
-PER_CLASS    = N_HID // N_CLASSES   # 10 neurons per class
+PER_CLASS    = N_HID // N_CLASSES   # 20 neurons per class
 
 F_MAX        = 8.0    # Hz — MSN saturation rate (depol-block onset)
 TRAIN_TEMP   = 0.3    # softmax temperature; CE on rates needs sharpening
@@ -55,7 +55,7 @@ TRAIN_TEMP   = 0.3    # softmax temperature; CE on rates needs sharpening
 
 
 class RateSNN(nn.Module):
-    """Differentiable rate proxy of the 100-neuron MSN classifier.
+    """Differentiable rate proxy of the 200-neuron MSN classifier.
 
     No bias term: the bias would map onto a tonic current I_0 in the MSN,
     which complicates the operating-point analysis. We let the synaptic
@@ -67,9 +67,9 @@ class RateSNN(nn.Module):
         self.fc = nn.Linear(N_PIX, N_HID, bias=False)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        h     = self.fc(x.view(-1, N_PIX))            # (B, 100)  pre-activation
-        rates = F_MAX * torch.sigmoid(h)              # (B, 100)  in Hz
-        # group-average readout: mean firing rate per class group of 10
+        h     = self.fc(x.view(-1, N_PIX))            # (B, 200)  pre-activation
+        rates = F_MAX * torch.sigmoid(h)              # (B, 200)  in Hz
+        # group-average readout: mean firing rate per class group of 20
         logits = rates.view(-1, N_CLASSES, PER_CLASS).mean(dim=2)   # (B, 10)
         return logits, rates
 
@@ -133,7 +133,7 @@ def main() -> None:
               f"{time.time()-t0:5.1f}s")
 
     # ── Save weights ─────────────────────────────────────────────────────────
-    W = net.fc.weight.detach().cpu().numpy().astype(np.float32)   # (100, 784)
+    W = net.fc.weight.detach().cpu().numpy().astype(np.float32)   # (200, 784)
     out_path = pathlib.Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez(out_path,
