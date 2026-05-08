@@ -1,6 +1,11 @@
 """
+<<<<<<< HEAD
 alif_thy_msn_compare.py
 =======================
+=======
+ns_msn_compare.py
+=================
+>>>>>>> ee6a5da (organize the comparasion part, there are previous models of adaptive LIF and the old thyristor notebook)
 Side-by-side comparison of three single-neuron models in this repo.
 
   SET A — aLIF        (modelcopare.py SET A)
@@ -308,7 +313,11 @@ fig.suptitle(
     'MSN replaces the reset rule with explicit Rm hysteresis → real spike waveform.',
     fontsize=12, fontweight='bold', y=1.005)
 
+<<<<<<< HEAD
 out_path = 'alif_thy_msn_compare.png'
+=======
+out_path = 'ns_msn_compare.png'
+>>>>>>> ee6a5da (organize the comparasion part, there are previous models of adaptive LIF and the old thyristor notebook)
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 
