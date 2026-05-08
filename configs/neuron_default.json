@@ -1,6 +1,6 @@
 {
   "_units": "All values in SI: F, Ohm, V, A, s",
-  "_source": "Wu et al. 2023, Fig. 2 — paper-faithful defaults",
+  "_source": "Wu et al. 2023, Fig. 2 ",
   "Cm":     1e-6,
   "Ra":     47.0,
   "Rm_hi":  100000.0,
