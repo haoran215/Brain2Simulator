@@ -43,17 +43,34 @@ def main() -> None:
     blob = np.load(args.weights, allow_pickle=True)
     W = blob['W'].astype(np.float32)            # (N, 784)
     cfg = json.loads(str(blob['config']))
-    w_max = cfg['w_max']
+    # STDP cfg has w_max; BSF cfg has X_max and binary W in {0,1}.
+    w_max = cfg.get('w_max', cfg.get('X_max', 1.0))
     w_e2i = cfg['w_e2i']
     w_i2e = cfg['w_i2e']
     N = W.shape[0]
 
-    eval_blob = np.load(args.eval, allow_pickle=True)
-    assigned = eval_blob['assigned_label']
-    test_acc = float(eval_blob['test_acc'])
-
-    order = np.argsort(assigned, kind='stable')
-    W_sorted = W[order]
+    have_eval = pathlib.Path(args.eval).exists()
+    if have_eval:
+        eval_blob = np.load(args.eval, allow_pickle=True)
+        assigned = eval_blob['assigned_label']
+        test_acc = float(eval_blob['test_acc'])
+        order = np.argsort(assigned, kind='stable')
+        W_sorted = W[order]
+    else:
+        # No eval available — sort neurons by centroid of their weight vector
+        # (row of pixel coords weighted by w) so visually similar receptive
+        # fields cluster together. Better than raw index order.
+        coords_y, coords_x = np.indices((28, 28))
+        flat_y = coords_y.ravel().astype(np.float32)
+        flat_x = coords_x.ravel().astype(np.float32)
+        sums = W.sum(axis=1) + 1e-9
+        cy = (W * flat_y).sum(axis=1) / sums
+        cx = (W * flat_x).sum(axis=1) / sums
+        sort_key = cy * 28 + cx
+        order = np.argsort(sort_key, kind='stable')
+        W_sorted = W[order]
+        assigned = None
+        test_acc = None
 
     fig = plt.figure(figsize=(15, 9))
     gs = fig.add_gridspec(2, 3, height_ratios=[1.2, 1])
@@ -62,12 +79,15 @@ def main() -> None:
     ax_a = fig.add_subplot(gs[0, :2])
     im = ax_a.imshow(W_sorted, aspect='auto', cmap='hot',
                      vmin=0, vmax=w_max, interpolation='nearest')
-    ax_a.set_title(f'(a) Input → E  weight matrix  ({N}×784, sorted by assigned digit)')
+    sort_label = ('sorted by assigned digit' if assigned is not None
+                  else 'sorted by RF centroid (no eval data)')
+    ax_a.set_title(f'(a) Input → E  weight matrix  ({N}×784, {sort_label})')
     ax_a.set_xlabel('pixel index (0–783)')
     ax_a.set_ylabel('E neuron (sorted)')
-    boundaries = np.where(np.diff(np.sort(assigned)))[0] + 1
-    for b in boundaries:
-        ax_a.axhline(b - 0.5, color='cyan', lw=0.6, alpha=0.7)
+    if assigned is not None:
+        boundaries = np.where(np.diff(np.sort(assigned)))[0] + 1
+        for b in boundaries:
+            ax_a.axhline(b - 0.5, color='cyan', lw=0.6, alpha=0.7)
     plt.colorbar(im, ax=ax_a, fraction=0.025)
 
     # (b) E → I  (1:1 identity)
@@ -90,16 +110,25 @@ def main() -> None:
     ax_c.set_ylabel('I neuron')
     plt.colorbar(im_c, ax=ax_c, fraction=0.04)
 
-    # (d) Assignment histogram
+    # (d) Assignment histogram (or weight-mass distribution if no eval)
     ax_d = fig.add_subplot(gs[1, 1:])
-    counts = np.bincount(assigned, minlength=10)
-    ax_d.bar(np.arange(10), counts, color='tab:purple', alpha=0.85)
-    for i, c in enumerate(counts):
-        ax_d.text(i, c + 0.1, str(int(c)), ha='center', fontsize=10)
-    ax_d.set_xticks(range(10))
-    ax_d.set_xlabel('assigned digit')
-    ax_d.set_ylabel('# E neurons')
-    ax_d.set_title(f'(d) E neurons per digit  —  test accuracy = {100*test_acc:.1f}%')
+    if assigned is not None:
+        counts = np.bincount(assigned, minlength=10)
+        ax_d.bar(np.arange(10), counts, color='tab:purple', alpha=0.85)
+        for i, c in enumerate(counts):
+            ax_d.text(i, c + 0.1, str(int(c)), ha='center', fontsize=10)
+        ax_d.set_xticks(range(10))
+        ax_d.set_xlabel('assigned digit')
+        ax_d.set_ylabel('# E neurons')
+        ax_d.set_title(f'(d) E neurons per digit  —  test accuracy = {100*test_acc:.1f}%')
+    else:
+        per_neuron_mass = W.sum(axis=1)
+        ax_d.bar(np.arange(N), np.sort(per_neuron_mass), color='tab:purple',
+                 alpha=0.85)
+        ax_d.set_xlabel('E neuron (sorted by row weight-sum)')
+        ax_d.set_ylabel('Σ weights into neuron')
+        ax_d.set_title('(d) per-neuron incoming weight mass '
+                       '(no eval — run eval_stdp.py for digit assignment)')
 
     fig.suptitle(f'STDP-MSN connectome  (N={N}, '
                  f'plastic input + fixed E↔I WTA)', y=1.0, fontsize=13)

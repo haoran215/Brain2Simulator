@@ -1,15 +1,15 @@
 """
 eval_msn_brian2.py
 ==================
-Evaluate the trained 784→200 weight matrix on MNIST in the *real* Brian2
+Evaluate the trained 784→100 weight matrix on MNIST in the *real* Brian2
 MSN simulator. Each test image is presented for T seconds; pixels drive
-784 Poisson sources whose spikes feed 200 MSN neurons via signed synapses
-(positive weights → Is1_exc, negative → Is1_inh). The 200 outputs are
-partitioned into 10 groups of 20; the group with the highest spike count
+784 Poisson sources whose spikes feed 100 MSN neurons via signed synapses
+(positive weights → Is1_exc, negative → Is1_inh). The 100 outputs are
+partitioned into 10 groups of 10; the group with the highest spike count
 wins.
 
 This is the rate-regime classification experiment requested:
-    - 200 MSN neurons, partitioned 10 × 10 (one group per digit)
+    - 100 MSN neurons, partitioned 10 × 10 (one group per digit)
     - Synaptic weights transferred from a PyTorch surrogate model
     - Predict by argmax of group spike count over T_present
 
@@ -160,7 +160,7 @@ def main() -> None:
 
     # Sanity check: typical input current to a hidden neuron under mean field.
     # <I_i> ≈ Σ_p W[i,p] · pixel_p · λ_max · τ_s · weight_scale
-    h_mean = (W @ X.mean(axis=0))                  # (100,)
+    h_mean = (W @ X.mean(axis=0))                  # (150,)
     I_mean = h_mean * args.lambda_max * args.tau_s * args.weight_scale
     I_min, I_max = params.operating_window()
     print(f"mean-field check: <I_in> ∈ [{I_mean.min()*1e6:+.1f}, "
@@ -252,7 +252,7 @@ def plot_results(y, preds, rates, args, acc, ann_acc, params):
     fig.colorbar(im, ax=ax, fraction=0.045, label='Hz')
 
     fig.suptitle(
-        f'MSN rate-regime classifier — 200 neurons (10 × 20 per class)   '
+        f'MSN rate-regime classifier — 100 neurons (10 × 10 per class)   '
         f'τ_s={args.tau_s*1e3:.0f} ms, T={args.T*1e3:.0f} ms, '
         f'λ_max={args.lambda_max:.0f} Hz, '
         f'w_scale={args.weight_scale*1e9:.0f} nA/unit   '

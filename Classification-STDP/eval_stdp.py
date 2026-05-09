@@ -78,7 +78,9 @@ def build_frozen_network(W: np.ndarray, theta: np.ndarray, cfg: dict):
     syn_in_e.connect(True)
     syn_i = np.array(syn_in_e.i[:], dtype=np.int64)
     syn_j = np.array(syn_in_e.j[:], dtype=np.int64)
-    syn_in_e.w = (W[syn_j, syn_i] * cfg['w_unit']) * amp
+    # STDP run uses w_unit; BSF run uses w_jump (binary readout already in W).
+    w_scale = cfg.get('w_unit', cfg.get('w_jump', 1.0))
+    syn_in_e.w = (W[syn_j, syn_i] * w_scale) * amp
 
     syn_e_i = Synapses(G_E, G_I, on_pre=f"Is1_exc_post += {cfg['w_e2i']}*amp",
                        name='syn_e_i')

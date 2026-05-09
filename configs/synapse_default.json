@@ -11,7 +11,7 @@
 
   "inh": {
     "_note": "Inhibitory — adds to Is1_inh of post-synaptic MSN",
-    "_wta_tuning": "10 µA: at ~7 Hz and tau_s=200ms gives steady-state 14 µA suppression",
+    "_wta_tuning": "20 µA: at ~50 Hz and tau_s=47ms gives steady-state 20 µA suppression",
     "weight": 1e-5,
     "kind":   "inh",
     "delay":  0.0
