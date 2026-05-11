@@ -39,11 +39,11 @@ seed(42)
 defaultclock.dt = 1*us
 
 # ─── Parameters (identical to ns_msn_v1.py) ──────────────────────────────────
-Cm_F      = 10e-6
+Cm_F      = 10e-7
 Ra_ohm    = 47
 Rm_hi_ohm = 100e3
 Rm_lo_ohm = 500
-Vth_V     = 0.9
+Vth_V     = 1.5
 I_hold_A  = 100e-6
 
 # ─── Sweep configuration ─────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ fig.suptitle(
     rf'$I_{{hold}}={I_hold_A*1e6:.0f}\,\mu A$',
     fontsize=12, fontweight='bold', y=1.02)
 
-out_path = 'demo/ns_msn_if_sweep.png'
+out_path = 'ns_msn_if_sweep.png'
 plt.savefig(out_path, dpi=120, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 

@@ -37,7 +37,8 @@ prefs.codegen.target = 'numpy'   # pure-Python backend, avoids C++ compiler
 defaultclock.dt = 10*us
 
 # ─── Parameters ──────────────────────────────────────────────────────────────
-params = MSNParams(tau_s1=200e-3, tau_s2=200e-3)
+params = MSNParams()                      # intrinsic params (no tau here)
+tau_s_val = 200e-3                        # synapse cascade τ (s)
 print(params.summary())
 I_min, I_max = params.operating_window()
 
@@ -49,12 +50,14 @@ t_pulse_dur  = 1.0*second       # pulse duration
 T_run        = 12.0*second
 
 # ─── Build neuron + self-excitatory synapse ───────────────────────────────────
-neuron = make_msn(N=1, params=params, name='msn_pop')
+neuron = make_msn(params=params, name='msn_pop')
 neuron.I_0 = I_0_val * amp
 
+# Cascade τ now lives on the synapse, not the neuron.
 syn_recur = make_synapse(
     source=neuron, target=neuron,
     kind='exc', weight=Iw_recur_val,
+    tau_s1=tau_s_val, tau_s2=tau_s_val,
     connect='i == j', name='syn_recur',
 )
 
@@ -68,12 +71,14 @@ def apply_pulse(t):
 
 # ─── Monitors ────────────────────────────────────────────────────────────────
 sp_mon = SpikeMonitor(neuron)
-st_mon = StateMonitor(neuron, ['Vm', 'Vout', 's', 'Is1_exc', 'Is2_exc', 'I_0'],
+st_mon = StateMonitor(neuron, ['Vm', 'Vout', 's', 'I_0'],
                       record=True, dt=200*us)
+# Cascade is on the synapse; record Is1/Is2 from the synapse object.
+syn_mon = StateMonitor(syn_recur, ['Is1', 'Is2'], record=True, dt=200*us)
 
 I_during = I_0_val + I_pulse_val
 deficit  = I_min - I_0_val
-f_crit   = deficit / (Iw_recur_val * params.tau_s2)
+f_crit   = deficit / (Iw_recur_val * tau_s_val)
 
 print(f"\nExperiment:")
 print(f"  I_0          = {I_0_val*1e6:.2f} µA  ({I_0_val/I_min*100:.0f}% of rheobase — subthreshold)")
@@ -100,7 +105,7 @@ if n_sp:
     print(f"  After pulse  : {len(post_sp)} spikes  ({'SUSTAINED' if len(post_sp) > 0 else 'SILENT'})")
     if len(post_sp) >= 2:
         f_post  = 1000.0 / np.mean(np.diff(post_sp))
-        sustain = Iw_recur_val * f_post * params.tau_s2
+        sustain = Iw_recur_val * f_post * tau_s_val
         print(f"  Post-pulse mean rate: {f_post:.1f} Hz  |  "
               f"Iw·f·τ_s = {sustain*1e6:.2f} µA  vs  deficit = {deficit*1e6:.2f} µA  "
               f"→  {'SUSTAIN' if sustain > deficit else 'FADE'}")
@@ -109,8 +114,8 @@ if n_sp:
 t_ms  = np.array(st_mon.t / ms)
 Vm    = np.array(st_mon.Vm[0]   / volt)
 Vout  = np.array(st_mon.Vout[0] / volt)
-Is1e  = np.array(st_mon.Is1_exc[0] / uA)
-Is2e  = np.array(st_mon.Is2_exc[0] / uA)
+Is1e  = np.array(syn_mon.Is1[0] / uA)   # cascade now lives on the synapse
+Is2e  = np.array(syn_mon.Is2[0] / uA)
 I0_v  = np.array(st_mon.I_0[0] / uA)
 s_v   = np.array(st_mon.s[0])
 
@@ -147,7 +152,7 @@ for ts in sp_mon.t / ms:
 ax.set_ylabel('Vm (V)')
 ax.set_title(
     f'Membrane voltage  |  I_0={I_0_val*1e6:.1f} µA (subthr.), '
-    f'Iw_rec={Iw_recur_val*1e6:.0f} µA, τ_s={params.tau_s1*1e3:.0f} ms  →  {n_sp} spikes',
+    f'Iw_rec={Iw_recur_val*1e6:.0f} µA, τ_s={tau_s_val*1e3:.0f} ms  →  {n_sp} spikes',
     fontweight='bold')
 ax.legend(fontsize=9, loc='upper right')
 
@@ -188,7 +193,7 @@ fig.suptitle(
     'subthreshold I_0 + self-recurrence sustains it',
     fontsize=12, fontweight='bold', y=1.005)
 plt.show()
-out_path = '/demo/ns_msn_v3_bump.png'
+out_path = 'ns_msn_v3_bump.png'
 plt.savefig(out_path, dpi=200, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 

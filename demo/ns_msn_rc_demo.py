@@ -1,6 +1,17 @@
 """
 ns_msn_rc_demo.py
 =================
+
+⚠️  NEEDS REWORK — does not run under the current msn_neuron / msn_synapse
+    refactor.  The cascade ODE moved from the neuron to the synapse and
+    Brian2's `(summed)` semantics now allow only ONE exc Synapses object
+    per target group.  This demo fans into one reservoir group with THREE
+    exc Synapses (syn_rec + syn_in_L + syn_in_R) and uses the old raw
+    `on_pre='Is1_exc_post += w'` pattern (Is1_exc no longer exists on the
+    neuron).  Port plan: merge L+R inputs into the reservoir self-Synapses
+    by combining sources, or add named per-pathway inlets to MSN_EQS.
+    Not in the critical path for the 2E+1I motif experiment.
+
 Reservoir Computing (RC) demo — left vs right pattern classification
 with 20 MSN neurons.
 

@@ -77,7 +77,7 @@ $$
 
 This produces a real `V_{\text{out}}` waveform whose shape is set by the circuit, not by a reset rule.
 
-### 3.1 Synaptic cascade (kept from the previous model)
+### 3.1 Synaptic cascade — cascade lives on the synapse
 
 Each pre-synaptic spike at neuron *j* contributes an instantaneous kick to a first-stage synaptic current `I_{s1}^{(j)}`, which feeds a second-stage current `I_{s2}^{(j)}` via a passive cascade:
 
@@ -91,6 +91,10 @@ $$
 
 For `\tau_{s1} = \tau_{s2} = \tau_s`, the response of `I_{s2}` to one pre-synaptic spike is the alpha function `(I_w/\tau_s) \cdot t \cdot e^{-t/\tau_s}`, peaking at `I_w/e` at `t = \tau_s`.
 
+**Where the ODE lives.** Architecturally, the cascade is integrated **on the Brian2 `Synapses` object**, not on the postsynaptic neuron. Each synapse type (E→I, I→E, mutual E↔E, …) owns its own `(τ_s1, τ_s2)` and contributes `I_{s2}` to the post neuron via a `(summed)` declaration. The neuron exposes named inlets (`I_exc`, `I_inh`, or any user-named inlet such as `I_inh_mutual`); each `Synapses` writes to exactly one inlet, and the neuron's Vm ODE uses the totals.
+
+Biologically this is the receptor view: AMPA, NMDA, GABA-A, GABA-B each have their own kinetics; the postsynaptic neuron sees the sum. The practical payoff is that **multiple pathways with different time constants can converge on the same neuron** — fast E→I (~10–100 ms), slow I→E (~100–200 ms), and even slower mutual E↔E (~500 ms) can all coexist on a single E neuron without sharing one τ.
+
 **Cascade settling time.** When firing begins at steady rate $f$, solving both ODEs with $\tau_{s1} = \tau_{s2} = \tau_s$ gives a closed-form build-up:
 
 $$
@@ -99,7 +103,7 @@ $$
 
 Settling milestones: 26% at $\tau_s$, 59% at $2\tau_s$, 80% at $3\tau_s$, 96% at $5\tau_s$, 99% at $7\tau_s$. With $\tau_s = 200$ ms, 96% convergence requires ~1 s — not 200 ms. An additional complication near rheobase: the firing rate $f$ is itself small when $I_0 + I_{s2}$ barely exceeds $I_{\min}$, making the early build-up sub-linear and extending the effective rise time beyond the constant-$f$ prediction (see §8.1).
 
-The neuron sees `I_{\text{syn}} = I_{s2}^{\text{exc}} - I_{s2}^{\text{inh}}` (in `NETWORK_MODE='Is2'`) or the corresponding `I_{s1}` difference.
+The neuron sees `I_{\text{syn}} = I_{\text{exc}} - I_{\text{inh}}`, where each total is the sum over all inlets of the same kind.
 
 ### 3.2 Why this is not strictly LIF
 
@@ -141,45 +145,61 @@ All scripts from `ns_msn_v3_bump.py` onward set option 2 explicitly at the top o
 
 ### 4.3 NeuronGroup specification
 
+Intrinsic params (Cm, Ra, Rm_hi, Rm_lo, Vth, I_hold) are per-neuron state variables — each neuron in a group can carry its own values, loaded from a per-neuron JSON file. The cascade is gone from the neuron; in its place are summed inlets:
+
 ```python
+# Default form — one I_exc inlet and one I_inh inlet
 eqs = """
-dVm/dt   = (I_0 + Is2_exc - Is2_inh - Vm/(Rm_S + Ra)) / Cm   : volt
-Rm_S     = (1 - s)*Rm_hi + s*Rm_lo                            : ohm
-I_M      = Vm / (Rm_S + Ra)                                   : amp
-Vout     = Vm * Ra / (Rm_S + Ra)                              : volt
-dIs1_exc/dt = -Is1_exc / tau_s1                                : amp
-dIs2_exc/dt = (-Is2_exc + Is1_exc) / tau_s2                    : amp
-dIs1_inh/dt = -Is1_inh / tau_s1                                : amp
-dIs2_inh/dt = (-Is2_inh + Is1_inh) / tau_s2                    : amp
-I_0      : amp
-s        : 1
+dVm/dt = (I_0 + I_exc - I_inh - Vm/(Rm_S + Ra)) / Cm   : volt
+Rm_S   = (1 - s)*Rm_hi + s*Rm_lo                       : ohm
+I_M    = Vm / (Rm_S + Ra)                              : amp
+Vout   = Vm * Ra / (Rm_S + Ra)                         : volt
+I_exc  : amp           # written by ONE exc Synapses group via (summed)
+I_inh  : amp           # written by ONE inh Synapses group via (summed)
+I_0    : amp
+s      : 1
+Cm     : farad (constant)
+Ra     : ohm   (constant)
+Rm_hi  : ohm   (constant)
+Rm_lo  : ohm   (constant)
+Vth    : volt  (constant)
+I_hold : amp   (constant)
 """
 
 G = NeuronGroup(
     N, eqs,
-    threshold='Vm > Vth and s < 0.5',     # open → closed (also emits spike)
-    reset='s = 1',                         # do NOT reset Vm
+    threshold='Vm > Vth and s < 0.5',   # open → closed (also emits spike)
+    reset='s = 1',                       # do NOT reset Vm
     events={'reopen': 'I_M < I_hold and s > 0.5'},
     method='euler',
 )
 G.run_on_event('reopen', 's = 0')
 ```
 
+When multiple pathways of the same kind converge on one neuron with different kinetics (e.g. global-inh + mutual-inh onto the same E neuron), `make_msn(..., inh_inlets=('I_inh_global', 'I_inh_mutual'))` declares extra inlets; `I_inh` then becomes a subexpression that sums them. Each `Synapses` object writes to exactly one inlet — this is the workaround for Brian2's "one summed writer per variable" rule.
+
 The Brian2 `threshold` event serves a dual role: it triggers the memristor close transition *and* fires the spike that downstream synapses listen to. This is physically correct — the moment the memristor closes is exactly when `V_{\text{out}}` begins to rise, which is what a downstream synapse should see.
 
 ### 4.4 Synapse specification
 
-Each synapse simply adds to the post-synaptic `I_{s1}`:
+Each Synapses object integrates its own cascade and writes the filtered current into a named inlet on the post neuron:
 
 ```python
 syn = Synapses(source, target,
-               model='w : amp',
-               on_pre='Is1_exc_post += w')
-syn.connect(condition='i == j')   # any Brian2 connection pattern
+    model='''
+        dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+        dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+        I_exc_post = Is2                       : amp (summed)
+        w : amp
+    ''',
+    on_pre='Is1 += w',
+    namespace={'tau_s1': 100*ms, 'tau_s2': 100*ms},
+)
+syn.connect(condition='i != j')
 syn.w = weight * amp
 ```
 
-With `w` declared per-synapse, individual edge weights are addressable, so the same machinery extends naturally to plasticity and heterogeneous networks.
+`tau_s1`/`tau_s2` are per-synapse-group namespace constants — set by `SynapseParams.from_json(...)` for that synapse type. `w` is per-edge (Brian2 `model='w : amp'`) so individual edge weights are addressable for plasticity and heterogeneous networks. `Is1` and `Is2` are per-edge cascade state, recordable via a `StateMonitor` on the `Synapses` object.
 
 ---
 
@@ -310,25 +330,57 @@ A future refinement is a *thyristor-style* closed state in which `V_M = V_{\text
 
 ## 7. Modular code organisation
 
-After validation, the neuron and synapse construction were factored into a reusable module ([`msn_lib.py`](msn_lib.py)) with three public entries:
+After validation, the neuron and synapse construction were factored into a **split library** along the biological neuron/synapse boundary:
+
+- [`msn_neuron.py`](msn_neuron.py) — `MSNParams`, `make_msn`, `msn_from_json`, `build_msn_eqs`.
+- [`msn_synapse.py`](msn_synapse.py) — `SynapseParams`, `make_synapse`.
+- [`demo/msn_lib.py`](demo/msn_lib.py) — back-compat shim that re-exports the new modules and adapts the old `make_synapse(kind=, weight=, …)` keyword signature.
+
+Per-neuron JSON configs in [`configs/`](configs/) carry intrinsic parameters; per-synapse JSON configs carry kinetics + weight:
 
 ```python
-from msn_lib import MSNParams, make_msn, make_synapse
+from msn_neuron  import MSNParams, make_msn
+from msn_synapse import SynapseParams, make_synapse
 
-params  = MSNParams(tau_s1=500e-3, tau_s2=500e-3)
-neurons = make_msn(N=20, params=params)
-neurons.I_0 = 0.85 * I_min * amp
+# Heterogeneous E group from per-neuron JSONs
+p_E1 = MSNParams.from_json('configs/E_neuron.json')
+p_E2 = MSNParams.from_json('configs/E_neuron.json')   # could differ
+E    = make_msn(params=[p_E1, p_E2], name='E')
+E.I_0 = np.array([30e-6, 30e-6]) * amp
 
-syn = make_synapse(
-    source=neurons, target=neurons,
-    kind='exc', weight=2e-6,
-    connect='abs(i-j) <= 2 and i != j',     # local recurrent
-)
+I    = make_msn(params=MSNParams.from_json('configs/I_neuron.json'), name='I')
+
+# Each synapse type carries its own τ
+syn_E_to_I = make_synapse(E, I,
+    params=SynapseParams.from_json('configs/syn_E_to_I.json'),
+    connect=True, name='syn_E_to_I')
+
+syn_I_to_E = make_synapse(I, E,
+    params=SynapseParams.from_json('configs/syn_I_to_E.json'),
+    connect=True, name='syn_I_to_E')
+
+# Slower mutual coupling — different τ on the same target neuron is fine
+# because each Synapses owns its kinetics
+syn_E_to_E = make_synapse(E, E,
+    params=SynapseParams.from_json('configs/syn_E_to_E.json'),
+    connect='i != j', name='syn_E_to_E')
 ```
 
-`MSNParams` is a dataclass containing the six hardware parameters plus the two synaptic time constants, with helper methods `operating_window()`, `time_constants()`, and `summary()`. Defaults reproduce Wu et al. Fig. 2.
+`MSNParams` carries the six intrinsic hardware parameters; `SynapseParams` carries `(weight, kind, tau_s1, tau_s2, delay, target_var)`. Each has `from_json`, `to_json`, and `summary()` helpers. Defaults reproduce Wu et al. Fig. 2.
 
-The module's docstring contains a tuning guide (sections 1–6 above) and a list of common Brian2 connection patterns (`'i == j'`, `'i != j'`, `True`, `'rand() < 0.1'`, etc.), so all downstream scripts inherit the same parameter conventions and connection vocabulary.
+When multiple pathways of the same kind need to converge on one neuron with different kinetics, declare extra inlets at construction:
+
+```python
+# E receives global inhibition from I AND mutual inhibition from E
+E = make_msn(params=[p_E1, p_E2], name='E',
+             inh_inlets=('I_inh_global', 'I_inh_mutual'))
+
+p_I_to_E   = SynapseParams.from_json('configs/syn_I_to_E.json')
+p_I_to_E.target_var = 'I_inh_global'                 # route here
+
+p_E_to_E_i = SynapseParams.from_json('configs/syn_E_to_E_inh.json')
+p_E_to_E_i.target_var = 'I_inh_mutual'               # different inlet, no clash
+```
 
 ---
 
@@ -372,21 +424,36 @@ Pre-existing (aLIF / Thyristor abstractions)
   spike_Ra_sweep.py           Ra sweep on the abstract aLIF
   modelcopare.py              aLIF vs Thyristor side-by-side
 
-New (paper-faithful MSN)
+Paper-faithful MSN (validation)
 ─────────────────────────────────────────────
   ns_msn_v1.py                single trace, paper Fig. 2 reproduction
   ns_msn_if_sweep.py          analytical + numerical I–F characterisation
   ns_msn_compare.py           aLIF vs Thyristor vs MSN side-by-side
   ns_msn_v2_synapses.py       MSN core + Is1/Is2 synapses + Poisson input
 
-Modular library
+Canonical modular library (cascade on synapse)
 ─────────────────────────────────────────────
-  msn_lib.py                  MSNParams, make_msn, make_synapse + tuning guide
+  msn_neuron.py               MSNParams, make_msn, msn_from_json,
+                              build_msn_eqs (multi-inlet support)
+  msn_synapse.py              SynapseParams, make_synapse — cascade ODE
+                              lives here, per-type τ
+  demo/msn_lib.py             back-compat shim re-exporting the above
 
-Network demonstrations (use msn_lib)
+Per-experiment configs (JSON, one file per neuron / synapse type)
 ─────────────────────────────────────────────
-  ns_msn_v3_bump.py           1 neuron + self-excit. bump test
-  ns_msn_v4_network.py        20-neuron ring with local recurrent excitation
+  configs/neuron_default.json,   E_neuron.json, I_neuron.json
+  configs/synapse_default.json,  syn_E_to_I.json, syn_I_to_E.json,
+                                 syn_E_to_E.json, syn_E_to_E_inh.json
+
+Network demonstrations
+─────────────────────────────────────────────
+  demo/ns_msn_v3_bump.py      1 neuron + self-excit. bump test
+  demo/ns_msn_v4_network.py   20-neuron ring with local recurrent exc
+  demo/ns_msn_wta_demo.py     two-neuron mutual-inhibition WTA
+  demo/two_E_one_I.py         2 E + 1 I motif — baseline / no_coupling /
+                              mutual_exc / mutual_inh modes
+  demo/ns_msn_rc_demo.py      reservoir-computing demo (needs port —
+                              header notes the open work)
 ```
 
 Each file's module docstring records its inheritance and what changed relative to its predecessor.
@@ -416,10 +483,12 @@ Each file's module docstring records its inheritance and what changed relative t
    $$
    with the threshold condition now on `V - V_S` rather than `V`. With `\tau_S = R_s C_s` short relative to `\tau_m`, this generates the four spiking modes (TS, FS, IB1, IB2) on the `(\tau_S, I_{\text{in}})` phase diagram. This is the next architectural extension when bursting is needed.
 
-5. **Parameter heterogeneity and code organisation.** In the current implementation `tau_s1` and `tau_s2` are namespace constants injected from `MSNParams`, meaning all $N$ neurons in a `NeuronGroup` share the same time constants. `syn.w` is already per-synapse (Brian2 `model='w : amp'`). To support heterogeneous populations the planned refactor has two levels:
+5. **Parameter heterogeneity and code organisation — shipped.** The library is now split (`msn_neuron.py` + `msn_synapse.py`, see §7) and the cascade lives on the synapse rather than the neuron. Two layers of heterogeneity are supported:
 
-   - **Split the library:** `msn_lib.py` → `msn_neuron.py` (hardware model: `MSNParams`, `make_msn`) + `msn_synapse.py` (connectivity: `SynapseParams`, `make_synapse`). This separates concerns so neuron and synapse logic can evolve independently.
-   - **Per-experiment config files:** each script imports its parameter distributions from a dedicated config file (`configs/ring_excit.py`, `configs/bump_test.py`, etc.) rather than hard-coding values inline. Promoting `tau_s1`, `tau_s2` to per-neuron state variables (`tau_s1 : second` in the equations) then allows heterogeneous assignment: `G.tau_s1 = np.random.normal(200e-3, 20e-3, N) * second`.
+   - **Per-neuron intrinsic params.** `Cm, Ra, Rm_hi, Rm_lo, Vth, I_hold` are state variables on the `NeuronGroup`. `make_msn(params=[p1, p2, ...])` accepts one `MSNParams` per neuron, each loadable from its own JSON. Per-neuron `I_0` is set after construction as before.
+   - **Per-synapse-type kinetics.** `tau_s1, tau_s2` are namespace constants on each `Synapses` object, set from `SynapseParams`. Different synapse types (E→I, I→E, mutual E↔E) carry independent τ even when they converge on the same postsynaptic group. Per-edge `w` is unchanged (Brian2 `model='w : amp'`).
+
+   What is not (yet) supported: per-edge `tau_s1/tau_s2` within a single `Synapses` object. Each synapse type is one group with one τ. Promoting these to per-edge state variables is a one-line change (`tau_s1 : second` in the synapse model, set via `syn.tau_s1 = ...`) if heterogeneity within a single synapse type is later needed.
 
 ---
 

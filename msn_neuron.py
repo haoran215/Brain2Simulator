@@ -7,10 +7,34 @@ Neuron half of the split library.  Synapse counterpart: msn_synapse.py.
 
     from msn_neuron import MSNParams, make_msn
 
-Parameters can be round-tripped through JSON:
+The cascade ODE (Is1 → Is2) lives on the SYNAPSE object (msn_synapse.py),
+so each synapse type carries its own time constants.  The neuron exposes
+summed inlets named by the caller; by default just two:
 
-    params = MSNParams.from_json('configs/neuron_default.json')
-    params.to_json('configs/my_params.json')
+    I_exc : amp   ← written by one exc Synapses group (via 'summed')
+    I_inh : amp   ← written by one inh Synapses group (via 'summed')
+
+When multiple pathways of the same kind converge on one neuron with
+different kinetics (e.g. global-inh from I and mutual-inh from E onto the
+same E neuron), declare extra inlets at construction:
+
+    E = make_msn(params=...,
+                 inh_inlets=('I_inh_global', 'I_inh_mutual'),
+                 name='E')
+
+Synapses then target a specific inlet via SynapseParams.target_var.  The
+neuron's Vm ODE always uses the totals I_exc and I_inh, summed over their
+respective inlets.
+
+Per-neuron heterogeneity
+─────────────────────────
+Intrinsic params (Cm, Ra, Rm_hi, Rm_lo, Vth, I_hold) are state variables,
+so each neuron in a NeuronGroup can carry its own values.  Load one JSON
+per neuron and pass the list to make_msn():
+
+    p1 = MSNParams.from_json('configs/E1.json')
+    p2 = MSNParams.from_json('configs/E2.json')
+    E  = make_msn(params=[p1, p2], name='E')   # N=2, heterogeneous
 
 See METHODOLOGY.md §3–5 for physics, equations, and tuning guide.
 """
@@ -19,8 +43,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, asdict
+from typing import Sequence
 
-from brian2 import NeuronGroup, farad, ohm, volt, amp, second
+import numpy as np
+from brian2 import NeuronGroup, farad, ohm, volt, amp
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -29,7 +55,7 @@ from brian2 import NeuronGroup, farad, ohm, volt, amp, second
 
 @dataclass
 class MSNParams:
-    """Hardware parameters for one MSN population.
+    """Intrinsic hardware parameters for one MSN neuron.
 
     All values in SI units.  Defaults reproduce Wu et al. 2023 Fig. 2.
 
@@ -40,19 +66,10 @@ class MSNParams:
     Rm_hi    Memristor open-state resistance       [Ω]
     Rm_lo    Memristor closed-state resistance     [Ω]
     Vth      Thyristor close threshold             [V]
-    I_hold   Holding current (reopen threshold)   [A]
+    I_hold   Holding current (reopen threshold)    [A]
 
-    Synaptic filter (can differ per population type)
-    ─────────────────────────────────────────────────
-    tau_s1   Is1 decay time constant   [s]
-    tau_s2   Is2 driven time constant  [s]
-
-    Note on heterogeneity
-    ─────────────────────
-    Currently tau_s1 / tau_s2 are namespace constants shared across all N
-    neurons in a NeuronGroup.  Planned: promote to per-neuron state variables
-    so that `G.tau_s1 = np.random.normal(...)` becomes possible (see
-    METHODOLOGY.md §10.5).
+    Note: synaptic time constants (tau_s1, tau_s2) live on the SYNAPSE
+    object now, not on the neuron.  See msn_synapse.SynapseParams.
     """
 
     Cm:     float = 10e-7      # F     (1 µF, paper value)
@@ -61,18 +78,19 @@ class MSNParams:
     Rm_lo:  float = 500.0      # Ω
     Vth:    float = 1.5        # V
     I_hold: float = 100e-6     # A
-    tau_s1: float = 200e-3     # s
-    tau_s2: float = 200e-3     # s
 
     # ── JSON I/O ──────────────────────────────────────────────────────────────
 
     @classmethod
     def from_json(cls, path: str) -> MSNParams:
         """Load parameters from a JSON file.  Unknown keys are silently ignored
-        so that JSON files can carry documentation fields (e.g. '_units')."""
+        so that JSON files can carry documentation fields (e.g. '_units').
+        Legacy keys tau_s1/tau_s2 (now on the synapse) are also ignored."""
         with open(path) as f:
             raw = json.load(f)
         known = {k: raw[k] for k in raw if not k.startswith('_')}
+        for legacy in ('tau_s1', 'tau_s2'):
+            known.pop(legacy, None)
         return cls(**known)
 
     def to_json(self, path: str) -> None:
@@ -91,7 +109,7 @@ class MSNParams:
         return self.Vth / (self.Rm_hi + self.Ra), self.I_hold
 
     def time_constants(self) -> tuple[float, float]:
-        """(τ_open, τ_close) in seconds.
+        """(τ_open, τ_close) in seconds — intrinsic membrane time constants.
 
         τ_open   = Cm * (Rm_hi + Ra)   charging time constant (~100 ms)
         τ_close  = Cm * (Rm_lo + Ra)   spike width time constant (~5 ms)
@@ -107,7 +125,6 @@ class MSNParams:
             f"  Cm={self.Cm*1e6:.2f} µF   Ra={self.Ra:.1f} Ω\n"
             f"  Rm_hi={self.Rm_hi/1e3:.0f} kΩ   Rm_lo={self.Rm_lo:.0f} Ω\n"
             f"  Vth={self.Vth:.3f} V   I_hold={self.I_hold*1e6:.0f} µA\n"
-            f"  tau_s1={self.tau_s1*1e3:.0f} ms   tau_s2={self.tau_s2*1e3:.0f} ms\n"
             f"  → I_min={I_min*1e6:.3f} µA   I_max={I_max*1e6:.0f} µA\n"
             f"  → τ_open={tau_o*1e3:.1f} ms   τ_close={tau_c*1e3:.2f} ms"
         )
@@ -116,81 +133,168 @@ class MSNParams:
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ Equations                                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# All intrinsic params (Cm, Ra, Rm_hi, Rm_lo, Vth, I_hold) are state
+# variables so each neuron in the group can be configured independently
+# from JSON.
+#
+# Synaptic inlets — each is a (summed) target written by ONE Synapses
+# group (Brian2 limitation: multiple summed writers to the same variable
+# overwrite each other).  To support multiple pathways of the same kind
+# onto one neuron group (e.g. global-inh + mutual-inh), declare multiple
+# inlets at construction time and route each Synapses to a unique one.
+# Defaults are 'I_exc' and 'I_inh'.  When extra inlets are declared,
+# I_exc and I_inh become subexpressions that sum the inlets.
 
-MSN_EQS = """
-dVm/dt      = (I_0 + Is2_exc - Is2_inh - Vm/(Rm_S + Ra)) / Cm  : volt
-Rm_S        = (1 - s)*Rm_hi + s*Rm_lo                           : ohm
-I_M         = Vm / (Rm_S + Ra)                                  : amp
-Vout        = Vm * Ra / (Rm_S + Ra)                             : volt
-dIs1_exc/dt = -Is1_exc / tau_s1                                 : amp
-dIs2_exc/dt = (-Is2_exc + Is1_exc) / tau_s2                     : amp
-dIs1_inh/dt = -Is1_inh / tau_s1                                 : amp
-dIs2_inh/dt = (-Is2_inh + Is1_inh) / tau_s2                    : amp
-I_0         : amp
-s           : 1
+def build_msn_eqs(exc_inlets: Sequence[str] = ('I_exc',),
+                  inh_inlets: Sequence[str] = ('I_inh',)) -> str:
+    """Construct the MSN equation string with the requested summed inlets.
+
+    Each inlet appears as a state variable `<name> : amp`; Synapses target
+    one inlet via `target_var` in SynapseParams.  The neuron's Vm ODE
+    always uses the totals `I_exc` and `I_inh`.
+
+    Conventions
+    -----------
+    - Single exc inlet named 'I_exc' (the default): no extra alias needed.
+    - Multiple exc inlets: must all be distinct names, none of them
+      'I_exc' (which becomes the derived subexpression `I_exc = sum...`).
+    - Same rules for inh inlets / 'I_inh'.
+    """
+    exc_inlets = tuple(exc_inlets) if exc_inlets else ('I_exc',)
+    inh_inlets = tuple(inh_inlets) if inh_inlets else ('I_inh',)
+
+    if len(exc_inlets) > 1 and 'I_exc' in exc_inlets:
+        raise ValueError(
+            "Multi-inlet exc must use distinct names, not 'I_exc' "
+            "(which becomes the derived sum)."
+        )
+    if len(inh_inlets) > 1 and 'I_inh' in inh_inlets:
+        raise ValueError(
+            "Multi-inlet inh must use distinct names, not 'I_inh'."
+        )
+
+    exc_inlet_decls = "\n".join(f"{n} : amp" for n in exc_inlets)
+    inh_inlet_decls = "\n".join(f"{n} : amp" for n in inh_inlets)
+    exc_alias = "" if exc_inlets == ('I_exc',) else \
+                f"I_exc = {' + '.join(exc_inlets)} : amp"
+    inh_alias = "" if inh_inlets == ('I_inh',) else \
+                f"I_inh = {' + '.join(inh_inlets)} : amp"
+
+    eqs = f"""
+dVm/dt   = (I_0 + I_exc - I_inh - Vm/(Rm_S + Ra)) / Cm   : volt
+Rm_S     = (1 - s)*Rm_hi + s*Rm_lo                        : ohm
+I_M      = Vm / (Rm_S + Ra)                               : amp
+Vout     = Vm * Ra / (Rm_S + Ra)                          : volt
+{exc_alias}
+{inh_alias}
+{exc_inlet_decls}
+{inh_inlet_decls}
+I_0      : amp
+s        : 1
+Cm       : farad (constant)
+Ra       : ohm   (constant)
+Rm_hi    : ohm   (constant)
+Rm_lo    : ohm   (constant)
+Vth      : volt  (constant)
+I_hold   : amp   (constant)
 """
+    return eqs
+
+
+# Default equation set — single I_exc + I_inh inlet (most demos use this).
+MSN_EQS = build_msn_eqs()
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ Factory                                                                  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-def make_msn(N: int,
-             params: MSNParams | None = None,
-             name: str = 'msn') -> NeuronGroup:
-    """Build a NeuronGroup of N MSN neurons.
+def make_msn(params: MSNParams | Sequence[MSNParams] | None = None,
+             N: int | None = None,
+             name: str = 'msn',
+             exc_inlets: Sequence[str] = ('I_exc',),
+             inh_inlets: Sequence[str] = ('I_inh',)) -> NeuronGroup:
+    """Build a NeuronGroup of MSN neurons.
 
     Parameters
     ----------
-    N      : number of neurons
-    params : MSNParams  (Wu et al. 2023 defaults if None)
-    name   : Brian2 group name — must be unique per start_scope()
+    params : MSNParams, list[MSNParams], or None
+        - Single MSNParams: broadcast to all N neurons (homogeneous group).
+        - List of MSNParams: one per neuron, length sets N (heterogeneous).
+        - None: defaults to one neuron with paper defaults.
+    N : int or None
+        Number of neurons.  Required when params is a single MSNParams and
+        N>1.  Must equal len(params) when params is a list (or omit it).
+    name : str
+        Brian2 group name — must be unique per start_scope().
+    exc_inlets, inh_inlets : tuple[str, ...]
+        Names of the (summed) synaptic inlets to declare on the neuron.
+        Defaults are ('I_exc',) and ('I_inh',).  Pass extra names when
+        multiple distinct pathways of the same kind need to target this
+        group (e.g. ('I_inh', 'I_inh_mutual') so global-inh and mutual-inh
+        can both write without 'summed' overwrite).
 
     Returns
     -------
     NeuronGroup with state variables:
-        Vm, Vout, I_M, Rm_S   — circuit quantities
-        s                     — memristor state (0=open, 1=closed)
-        I_0                   — per-neuron tonic bias [A]
-        Is1_exc, Is2_exc      — excitatory synaptic cascade [A]
-        Is1_inh, Is2_inh      — inhibitory synaptic cascade [A]
-
-    All initialised to 0.  Set per-neuron bias AFTER construction:
-
-        G.I_0 = 18e-6 * amp                      # scalar: same for all
-        G.I_0 = np.array([18e-6, 0.0]) * amp     # array:  per-neuron
+        Vm, Vout, I_M, Rm_S            — circuit quantities
+        s                              — memristor state (0=open, 1=closed)
+        I_0                            — per-neuron tonic bias [A]
+        <inlet names>                  — summed synaptic inlets [A]
+        Cm, Ra, Rm_hi, Rm_lo, Vth, I_hold — per-neuron intrinsic params
     """
     if params is None:
         params = MSNParams()
+    if isinstance(params, MSNParams):
+        if N is None:
+            N = 1
+        params_list = [params] * N
+    else:
+        params_list = list(params)
+        if N is not None and N != len(params_list):
+            raise ValueError(
+                f"N={N} disagrees with len(params)={len(params_list)}"
+            )
+        N = len(params_list)
 
-    namespace = dict(
-        Cm     = params.Cm     * farad,
-        Ra     = params.Ra     * ohm,
-        Rm_hi  = params.Rm_hi  * ohm,
-        Rm_lo  = params.Rm_lo  * ohm,
-        Vth    = params.Vth    * volt,
-        I_hold = params.I_hold * amp,
-        tau_s1 = params.tau_s1 * second,
-        tau_s2 = params.tau_s2 * second,
-    )
+    eqs = build_msn_eqs(exc_inlets=exc_inlets, inh_inlets=inh_inlets)
 
     G = NeuronGroup(
-        N, MSN_EQS,
+        N, eqs,
         threshold = 'Vm > Vth and s < 0.5',
         reset     = 's = 1',
         events    = {'reopen': 'I_M < I_hold and s > 0.5'},
         method    = 'euler',
-        namespace = namespace,
         name      = name,
     )
     G.run_on_event('reopen', 's = 0')
 
-    G.Vm      = 0 * volt
-    G.s       = 0
-    G.I_0     = 0 * amp
-    G.Is1_exc = 0 * amp
-    G.Is2_exc = 0 * amp
-    G.Is1_inh = 0 * amp
-    G.Is2_inh = 0 * amp
+    G.Vm  = 0 * volt
+    G.s   = 0
+    G.I_0 = 0 * amp
+    for inlet in tuple(exc_inlets) + tuple(inh_inlets):
+        setattr(G, inlet, 0 * amp)
+
+    G.Cm     = np.array([p.Cm     for p in params_list]) * farad
+    G.Ra     = np.array([p.Ra     for p in params_list]) * ohm
+    G.Rm_hi  = np.array([p.Rm_hi  for p in params_list]) * ohm
+    G.Rm_lo  = np.array([p.Rm_lo  for p in params_list]) * ohm
+    G.Vth    = np.array([p.Vth    for p in params_list]) * volt
+    G.I_hold = np.array([p.I_hold for p in params_list]) * amp
 
     return G
+
+
+def msn_from_json(paths: str | Sequence[str], name: str = 'msn') -> NeuronGroup:
+    """Convenience loader: build a NeuronGroup directly from JSON path(s).
+
+    Examples
+    --------
+        I = msn_from_json('configs/I_neuron.json', name='I')         # N=1
+        E = msn_from_json(['configs/E1.json', 'configs/E2.json'],    # N=2
+                          name='E')
+    """
+    if isinstance(paths, str):
+        return make_msn(params=MSNParams.from_json(paths), name=name)
+    return make_msn(params=[MSNParams.from_json(p) for p in paths], name=name)

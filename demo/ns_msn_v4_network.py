@@ -43,16 +43,19 @@ seed(42)
 defaultclock.dt = 10*us
 
 # ─── Parameters ──────────────────────────────────────────────────────────────
-params = MSNParams(tau_s1=500e-3, tau_s2=500e-3)
+# Cascade τ now lives on the synapse, not the neuron.
+params    = MSNParams()
+tau_s_val = 500e-3
 print(params.summary())
 I_min, I_max = params.operating_window()
 
 N            = 20
 I_0_val      = 0.85 * I_min        # subthreshold
-Iw_input_val = 30e-6                # cue weight (same as v3)
+I_cue_boost  = 0.3 * I_min          # cue: brief I_0 bump on cue_idx
 Iw_recur_val = 2.0e-6               # per recurrent edge (scaled ~1/4 of v3)
 cue_idx      = [9, 10]              # centre of the ring
 t_pulse      = 2.5 * second
+t_pulse_dur  = 50.0 * ms            # short cue
 T_run        = 8.0 * second
 
 # ─── Build the population ────────────────────────────────────────────────────
@@ -69,34 +72,38 @@ ring_cond = (
 syn_recur = make_synapse(
     source=neurons, target=neurons,
     kind='exc', weight=Iw_recur_val,
+    tau_s1=tau_s_val, tau_s2=tau_s_val,
     connect=ring_cond, name='ring_recur',
 )
 print(f"Recurrent edges: {len(syn_recur)}  (expected 4·N = {4*N})")
 
-# ─── External input cue: 1 spike to neurons in `cue_idx` ─────────────────────
-gen = SpikeGeneratorGroup(
-    N,
-    indices=np.array(cue_idx),
-    times=np.array([float(t_pulse/second)] * len(cue_idx)) * second,
-    name='cue_gen',
-)
-syn_input = make_synapse(
-    source=gen, target=neurons,
-    kind='exc', weight=Iw_input_val,
-    connect='i == j', name='syn_input',
-)
+# ─── Cue delivery — brief I_0 boost on cue neurons ───────────────────────────
+# Under the new model, only ONE exc Synapses group may target a given group
+# via 'summed'.  The recurrent ring owns I_exc on `neurons`, so we deliver
+# the cue as a direct bias bump rather than via a second exc synapse.
+_t_cue_end = float((t_pulse + t_pulse_dur) / second)
+_t_cue_beg = float(t_pulse / second)
+_cue_idx_np = np.array(cue_idx)
+
+@network_operation(when='start')
+def deliver_cue(t):
+    tval = float(t/second)
+    if _t_cue_beg <= tval < _t_cue_end:
+        neurons.I_0[_cue_idx_np] = (I_0_val + I_cue_boost) * amp
+    else:
+        neurons.I_0[_cue_idx_np] = I_0_val * amp
 
 # ─── Monitors ────────────────────────────────────────────────────────────────
 sp_mon = SpikeMonitor(neurons)
-st_mon = StateMonitor(neurons, ['Vm', 'Vout', 'Is2_exc'],
+st_mon = StateMonitor(neurons, ['Vm', 'Vout', 'I_exc'],
                       record=True, dt=2*ms)
 
 print(f"\nExperiment:")
 print(f"  N            = {N} neurons")
 print(f"  I_0          = {I_0_val*1e6:.2f} µA  ({I_0_val/I_min*100:.0f}% rheobase)")
-print(f"  Iw_input     = {Iw_input_val*1e6:.0f} µA  to neurons {cue_idx}")
+print(f"  I_cue_boost  = {I_cue_boost*1e6:.2f} µA  on neurons {cue_idx} for {t_pulse_dur/ms:.0f} ms")
 print(f"  Iw_recur     = {Iw_recur_val*1e6:.1f} µA  per edge (4 in-degree)")
-print(f"  τ_s          = {params.tau_s1*1e3:.0f} ms")
+print(f"  τ_s (recur)  = {tau_s_val*1e3:.0f} ms")
 print(f"  t_pulse      = {t_pulse/second:.1f} s,   T_run = {T_run/second:.1f} s")
 print()
 
@@ -138,20 +145,20 @@ ax.set_title(
     fontsize=11, fontweight='bold')
 ax.legend(loc='upper right', fontsize=9)
 
-# (1) Heatmap of Is2_exc over time × neuron index
+# (1) Heatmap of I_exc (summed exc inlet) over time × neuron index
 ax = fig.add_subplot(gs[1, 0])
-Is2 = np.array(st_mon.Is2_exc / uA)        # shape (N, T)
-im = ax.imshow(Is2, aspect='auto', origin='lower',
+Iexc = np.array(st_mon.I_exc / uA)         # shape (N, T)
+im = ax.imshow(Iexc, aspect='auto', origin='lower',
                extent=[0, float(T_run/second), -0.5, N-0.5],
                cmap='magma', interpolation='nearest')
 ax.axvline(float(t_pulse/second), color='cyan', ls=':', lw=1.2)
 for ci in cue_idx:
     ax.axhline(ci, color='cyan', ls='-', lw=0.5, alpha=0.5)
 ax.set_xlabel('t (s)'); ax.set_ylabel('neuron index')
-ax.set_title('Is2_exc heatmap — recurrent current spreading through the ring',
+ax.set_title('I_exc heatmap — recurrent current spreading through the ring',
              fontsize=11, fontweight='bold')
 cbar = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.01)
-cbar.set_label('Is2_exc (µA)', fontsize=9)
+cbar.set_label('I_exc (µA)', fontsize=9)
 
 # (2) Population spike count per 100 ms bin
 ax = fig.add_subplot(gs[2, 0])
