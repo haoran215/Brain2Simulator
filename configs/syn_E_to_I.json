@@ -1,0 +1,10 @@
+{
+  "_units": "weight in A, tau in s, delay in s",
+  "_role": "Slow excitation from E neurons onto I (matched timescale with I→E)",
+  "_design": "tau_s ~ 100 ms — comparable to MSN τ_open (~100 ms) and to the I→E inhibitory cascade, much slower than intrinsic self-E (~5 ms thyristor close). At this tau the cascade integrates over several E spikes; weight chosen so the integrated drive comfortably pushes I above its rheobase at E rates of a few Hz.",
+  "weight": 8e-6,
+  "kind":   "exc",
+  "tau_s1": 0.100,
+  "tau_s2": 0.100,
+  "delay":  0.0
+}

@@ -1,0 +1,11 @@
+{
+  "_units": "All values in SI: F, Ohm, V, A",
+  "_role": "Inhibitory MSN neuron (I) in the 2E+1I motif demo",
+  "_notes": "Same intrinsic params as E for now; the role (inhibitory) is set by the outgoing synapse kind, not by any neuron-level property.",
+  "Cm":     1e-6,
+  "Ra":     47.0,
+  "Rm_hi":  100000.0,
+  "Rm_lo":  500.0,
+  "Vth":    1.5,
+  "I_hold": 1e-4
+}

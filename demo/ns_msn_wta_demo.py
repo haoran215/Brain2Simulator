@@ -20,14 +20,14 @@ WTA phases
 ──────────
   Phase 1  t = 0 → 3 s   N1 driven above rheobase (D1 = 1.3·I_min).
                            N2 subthreshold (D2 = 0).
-                           N1 fires, builds Is2_inh on N2.
+                           N1 fires, builds I_inh on N2.
 
   Phase 2  t = 3 → 7 s   N2 receives strong drive (D2 = 3.3·I_min).
                            N2 fires faster than N1, rapidly builds
                            inhibition on N1.  N1 suppressed within ~1 s.
                            N2 wins.
 
-  Phase 3  t = 7 → 10 s  N2 drive removed.  Is2_inh on N1 decays (τ_s).
+  Phase 3  t = 7 → 10 s  N2 drive removed.  I_inh on N1 decays (τ_s).
                            N1 recovers and wins again.
 
 External input types shown
@@ -86,9 +86,8 @@ print(exc_params.summary(), '\n')
 # ║ 2. Build neuron populations                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 # Separate NeuronGroups so each has a readable name.
-# For a large homogeneous population use make_msn(N=100, ...).
-N1 = make_msn(N=1, params=neuron_params, name='N1')
-N2 = make_msn(N=1, params=neuron_params, name='N2')
+N1 = make_msn(params=neuron_params, name='N1')
+N2 = make_msn(params=neuron_params, name='N2')
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -171,7 +170,9 @@ syn_N2_to_N1 = make_synapse(
 # ║ 5. Monitors                                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 # StateMonitor dt=1ms keeps memory manageable for a 10 s run.
-rec_vars = ['Vm', 'Vout', 'Is2_exc', 'Is2_inh', 'I_0']
+# Cascade Is1/Is2 now lives on the synapse — record I_inh (the summed
+# inlet on the neuron) for the inhibitory current view.
+rec_vars = ['Vm', 'Vout', 'I_exc', 'I_inh', 'I_0']
 
 st_N1 = StateMonitor(N1, rec_vars, record=True, dt=1*ms)
 st_N2 = StateMonitor(N2, rec_vars, record=True, dt=1*ms)
@@ -239,8 +240,8 @@ Vm1    = np.array(st_N1.Vm[0]    / volt)
 Vm2    = np.array(st_N2.Vm[0]    / volt)
 Vout1  = np.array(st_N1.Vout[0]  / volt) * 1e3   # mV
 Vout2  = np.array(st_N2.Vout[0]  / volt) * 1e3
-Iinh1  = np.array(st_N1.Is2_inh[0] / amp) * 1e6  # µA  (inhibition ON N1)
-Iinh2  = np.array(st_N2.Is2_inh[0] / amp) * 1e6  # µA  (inhibition ON N2)
+Iinh1  = np.array(st_N1.I_inh[0] / amp) * 1e6  # µA  (inhibition ON N1)
+Iinh2  = np.array(st_N2.I_inh[0] / amp) * 1e6  # µA  (inhibition ON N2)
 I0_1   = np.array(st_N1.I_0[0]   / amp) * 1e6
 I0_2   = np.array(st_N2.I_0[0]   / amp) * 1e6
 
@@ -301,12 +302,12 @@ ax.set_title('Output voltage — real spike waveform from Cm discharge through R
 ax.legend(fontsize=8, loc='upper left')
 
 
-# ─── Panel 3: Inhibitory currents (Is2_inh on each neuron) ──────────────────
+# ─── Panel 3: Inhibitory currents (I_inh on each neuron) ──────────────────
 ax = fig.add_subplot(gs[3])
 ax.plot(t_ms, Iinh1, color=C1, lw=1.2,
-        label='Is2_inh on N1  (from N2 spikes)')
+        label='I_inh on N1  (from N2 spikes)')
 ax.plot(t_ms, Iinh2, color=C2, lw=1.2,
-        label='Is2_inh on N2  (from N1 spikes)')
+        label='I_inh on N2  (from N1 spikes)')
 ax.axhline(0, color='k', lw=0.5)
 # Annotate the suppression threshold for N1
 ax.axhline(D1 * 1e6, color=C1, ls=':', lw=1,
@@ -314,7 +315,7 @@ ax.axhline(D1 * 1e6, color=C1, ls=':', lw=1,
 ax.axhline(D2_on * 1e6, color=C2, ls=':', lw=1,
            label=f'N2 drive D2 = {D2_on*1e6:.1f} µA — inh above this silences N2')
 shade_phases(ax)
-ax.set_ylabel('Is2_inh (µA)')
+ax.set_ylabel('I_inh (µA)')
 ax.set_title('Inhibitory synaptic current — cascade build-up shows WTA competition',
              fontweight='bold')
 ax.legend(fontsize=8, loc='upper left', ncol=2)

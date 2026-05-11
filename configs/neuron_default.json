@@ -1,12 +1,11 @@
 {
-  "_units": "All values in SI: F, Ohm, V, A, s",
+  "_units": "All values in SI: F, Ohm, V, A",
   "_source": "Wu et al. 2023, Fig. 2 — paper-faithful defaults",
+  "_note": "tau_s1/tau_s2 moved to synapse configs (msn_synapse.SynapseParams)",
   "Cm":     1e-6,
   "Ra":     47.0,
   "Rm_hi":  100000.0,
   "Rm_lo":  500.0,
   "Vth":    1.5,
-  "I_hold": 1e-4,
-  "tau_s1": 0.2,
-  "tau_s2": 0.2
+  "I_hold": 1e-4
 }
