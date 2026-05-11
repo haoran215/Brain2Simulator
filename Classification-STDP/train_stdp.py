@@ -92,6 +92,7 @@ def build_network(
     N: int,
     *,
     params: MSNParams,
+    tau_s: float,         # s — synaptic cascade τ_s1 = τ_s2 (shared)
     w_unit: float,        # A — amps per unit dimensionless w
     w_max: float,         # dimensionless ceiling
     eta_pre: float,
@@ -104,29 +105,33 @@ def build_network(
     w_i2e: float,         # A — fixed kick I→E (lateral)
     seed_init: int,
 ):
-    """Build the network and return (Net, P, G_E, G_I, syn_in_e, sp_E, sp_I)."""
+    """Build the network and return (Net, P, G_E, G_I, syn_in_e, sp_E, sp_I).
+
+    Pattern A + C: G_E gets exc (from input STDP) + inh (from I→E lateral);
+    G_I gets exc only. No multi-inlet needed. Cascade lives on each Synapses.
+    """
     rng = np.random.default_rng(seed_init)
 
     P = PoissonGroup(784, rates=np.zeros(784) * Hz, name='inp')
-    G_E = make_msn(N, params=params, name='E')
-    G_I = make_msn(N, params=params, name='I')
+    G_E = make_msn(params=params, N=N, name='E')
+    G_I = make_msn(params=params, N=N, name='I')
     G_E.I_0 = 0 * amp
     G_I.I_0 = 0 * amp
 
+    # ── STDP input synapse with cascade ODE in the model block ───────────────
     stdp_model = '''
-        w : 1
+        dIs1/dt   = -Is1 / tau_s1                  : amp (clock-driven)
+        dIs2/dt   = (-Is2 + Is1) / tau_s2          : amp (clock-driven)
+        I_exc_post = Is2                           : amp (summed)
+        w         : 1
         dapre/dt  = -apre /tau_pre  : 1 (event-driven)
         dapost/dt = -apost/tau_post : 1 (event-driven)
     '''
     on_pre = '''
-        Is1_exc_post += w * w_unit
+        Is1 += w * w_unit
         apre += 1
         w = clip(w - eta_pre * apost, 0, w_max)
     '''
-    # Diehl & Cook 2015 eq. 7: LTP scaled by recent presynaptic activity,
-    # plus an unconditional w^μ decay on every postsynaptic spike. The
-    # decay term is what drives competitive specialisation — without it,
-    # active synapses saturate to w_max and stay there.
     on_post = '''
         apost += 1
         w = clip(w + eta_post * apre - eta_post * x_tar * w**mu, 0, w_max)
@@ -134,7 +139,10 @@ def build_network(
     syn_in_e = Synapses(
         P, G_E,
         model=stdp_model, on_pre=on_pre, on_post=on_post,
+        method='euler',
         namespace=dict(
+            tau_s1   = tau_s    * second,
+            tau_s2   = tau_s    * second,
             tau_pre  = tau_pre  * second,
             tau_post = tau_post * second,
             w_unit   = w_unit   * amp,
@@ -146,14 +154,48 @@ def build_network(
         ),
         name='syn_in_e',
     )
-    syn_in_e.connect(True)                          # 784 × N all-to-all
+    syn_in_e.connect(True)
     syn_in_e.w = rng.uniform(0.0, 0.3, size=784 * N)
+    syn_in_e.Is1 = 0 * amp
+    syn_in_e.Is2 = 0 * amp
 
-    syn_e_i = Synapses(G_E, G_I, on_pre=f'Is1_exc_post += {w_e2i}*amp', name='syn_e_i')
+    # ── Fixed E→I exc cascade ────────────────────────────────────────────────
+    syn_e_i = Synapses(
+        G_E, G_I,
+        model='''
+            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+            I_exc_post = Is2                       : amp (summed)
+            w : amp
+        ''',
+        on_pre='Is1 += w',
+        method='euler',
+        namespace={'tau_s1': tau_s*second, 'tau_s2': tau_s*second},
+        name='syn_e_i',
+    )
     syn_e_i.connect(j='i')                          # 1:1
+    syn_e_i.w = w_e2i * amp
+    syn_e_i.Is1 = 0 * amp
+    syn_e_i.Is2 = 0 * amp
 
-    syn_i_e = Synapses(G_I, G_E, on_pre=f'Is1_inh_post += {w_i2e}*amp', name='syn_i_e')
-    syn_i_e.connect(condition='i != j')             # all-but-self lateral
+    # ── Fixed I→E inh cascade (lateral, all-but-self) ────────────────────────
+    syn_i_e = Synapses(
+        G_I, G_E,
+        model='''
+            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+            I_inh_post = Is2                       : amp (summed)
+            w : amp
+        ''',
+        on_pre='Is1 += w',
+        method='euler',
+        namespace={'tau_s1': tau_s*second, 'tau_s2': tau_s*second},
+        name='syn_i_e',
+    )
+    syn_i_e.connect(condition='i != j')
+    syn_i_e.w = w_i2e * amp
+    syn_i_e.Is1 = 0 * amp
+    syn_i_e.Is2 = 0 * amp
 
     sp_E = SpikeMonitor(G_E, name='sp_E')
     sp_I = SpikeMonitor(G_I, name='sp_I')
@@ -185,12 +227,13 @@ def train(args) -> None:
     # post-spikes per presentation for spike-driven STDP to work. We pick
     # Cm so f_max lands around the 100–200 Hz regime where the algorithm
     # was originally tuned.
-    params = MSNParams(Cm=args.Cm, tau_s1=args.tau_s, tau_s2=args.tau_s)
+    params = MSNParams(Cm=args.Cm)         # tau_s now lives on the synapse
     print(params.summary())
 
     net, P, G_E, G_I, syn_in_e, sp_E, sp_I = build_network(
         args.N,
         params      = params,
+        tau_s       = args.tau_s,
         w_unit      = args.w_unit,
         w_max       = args.w_max,
         eta_pre     = args.eta_pre,

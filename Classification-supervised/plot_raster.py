@@ -81,8 +81,8 @@ def main() -> None:
     X, y = pick_one_per_class(args.data, args.seed)
     print(f"selected one test image per class: y={y.tolist()}")
 
-    params = MSNParams(tau_s1=args.tau_s, tau_s2=args.tau_s)
-    net, P, sp = build_network(W, params, args.weight_scale)
+    params = MSNParams()                  # tau_s now lives on the synapse
+    net, P, sp = build_network(W, params, args.weight_scale, tau_s=args.tau_s)
     net.store('init')
 
     T_run = args.T * second

@@ -110,7 +110,7 @@ def main() -> None:
                'N × E-MSN',
                color='#FFB3B3',
                subtext='excitatory\n+ homeo θ')
-    arrow(ax, (6.83, 4.95), (7.3, 4.95), label='Is1_exc', label_offset=(0, 0.22),
+    arrow(ax, (6.83, 4.95), (7.3, 4.95), label='I_exc', label_offset=(0, 0.22),
           label_fontsize=8, label_color='#333')
 
     # ── (5) I-MSN layer ─────────────────────────────────────────────────────

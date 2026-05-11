@@ -94,6 +94,7 @@ def build_network(
     N: int,
     *,
     params: MSNParams,
+    tau_s: float,         # s — synaptic cascade τ_s1 = τ_s2 (shared)
     # BSF synapse
     w_jump: float,        # A — current delivered when X > theta_X (binary readout)
     X_max: float,         # X ceiling
@@ -115,27 +116,27 @@ def build_network(
     rng = np.random.default_rng(seed_init)
 
     P = PoissonGroup(784, rates=np.zeros(784) * Hz, name='inp')
-    G_E = make_msn(N, params=params, name='E')
-    G_I = make_msn(N, params=params, name='I')
+    G_E = make_msn(params=params, N=N, name='E')
+    G_I = make_msn(params=params, N=N, name='I')
     G_E.I_0 = 0 * amp
     G_I.I_0 = 0 * amp
 
+    # BSF input synapse with cascade in the model block.  Pre-spike delivers
+    # a binary kick into Is1 (gated by X > theta_X) and triggers the BSF
+    # bistable X update gated by Vm_post and the calcium trace C.
     bsf_model = '''
+        dIs1/dt = -Is1 / tau_s1                  : amp (clock-driven)
+        dIs2/dt = (-Is2 + Is1) / tau_s2          : amp (clock-driven)
+        I_exc_post = Is2                         : amp (summed)
         X : 1
         dC/dt = -C/tau_C : 1 (event-driven)
     '''
-    # Pre-spike: deliver binary effective current, then BSF jump conditional
-    # on post Vm and post C. Note: Vm_post is read at the spike instant, so
-    # the synapse sees the post-neuron's voltage just before any reset rule
-    # at the same step would fire — exactly the BSF semantics.
     on_pre = '''
-        Is1_exc_post += w_jump * int(X > theta_X)
+        Is1 += w_jump * int(X > theta_X)
         pot_gate = int(Vm_post > theta_V) * int(C >= theta_lo_p) * int(C < theta_hi_p)
         dep_gate = int(Vm_post <= theta_V) * int(C >= theta_lo_d) * int(C < theta_hi_d)
         X = clip(X + a_LTP * pot_gate - a_LTD * dep_gate, 0.0, X_max)
     '''
-    # Post-spike: increment calcium. No direct X change at post-spike in BSF
-    # — all jumps happen at pre-spike. The post-spike just feeds the C trace.
     on_post = '''
         C += J_C
     '''
@@ -143,7 +144,10 @@ def build_network(
     syn_in_e = Synapses(
         P, G_E,
         model=bsf_model, on_pre=on_pre, on_post=on_post,
+        method='euler',
         namespace=dict(
+            tau_s1      = tau_s * second,
+            tau_s2      = tau_s * second,
             tau_C       = tau_C * second,
             w_jump      = w_jump * amp,
             theta_V     = theta_V * volt,
@@ -160,20 +164,51 @@ def build_network(
         name='syn_in_e',
     )
     syn_in_e.connect(True)
-    # Heterogeneous init around the bistable midpoint so WTA has something
-    # to arbitrate from step zero (the third STDP failure was symmetry that
-    # never broke). 30% start "ON", 70% start "OFF" with a Gaussian spread.
     n_syn = 784 * N
     init_X = rng.normal(loc=theta_X, scale=0.25, size=n_syn)
     init_X = np.clip(init_X, 0.0, X_max).astype(np.float64)
     syn_in_e.X = init_X
     syn_in_e.C = 0.0
+    syn_in_e.Is1 = 0 * amp
+    syn_in_e.Is2 = 0 * amp
 
-    syn_e_i = Synapses(G_E, G_I, on_pre=f'Is1_exc_post += {w_e2i}*amp', name='syn_e_i')
+    # Fixed E→I exc cascade
+    syn_e_i = Synapses(
+        G_E, G_I,
+        model='''
+            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+            I_exc_post = Is2                       : amp (summed)
+            w : amp
+        ''',
+        on_pre='Is1 += w',
+        method='euler',
+        namespace={'tau_s1': tau_s*second, 'tau_s2': tau_s*second},
+        name='syn_e_i',
+    )
     syn_e_i.connect(j='i')
+    syn_e_i.w = w_e2i * amp
+    syn_e_i.Is1 = 0 * amp
+    syn_e_i.Is2 = 0 * amp
 
-    syn_i_e = Synapses(G_I, G_E, on_pre=f'Is1_inh_post += {w_i2e}*amp', name='syn_i_e')
+    # Fixed I→E inh cascade (lateral, all-but-self)
+    syn_i_e = Synapses(
+        G_I, G_E,
+        model='''
+            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+            I_inh_post = Is2                       : amp (summed)
+            w : amp
+        ''',
+        on_pre='Is1 += w',
+        method='euler',
+        namespace={'tau_s1': tau_s*second, 'tau_s2': tau_s*second},
+        name='syn_i_e',
+    )
     syn_i_e.connect(condition='i != j')
+    syn_i_e.w = w_i2e * amp
+    syn_i_e.Is1 = 0 * amp
+    syn_i_e.Is2 = 0 * amp
 
     sp_E = SpikeMonitor(G_E, name='sp_E')
     sp_I = SpikeMonitor(G_I, name='sp_I')
@@ -198,12 +233,13 @@ def train(args) -> None:
     X_data, y = load_mnist_train(args.n_images, args.data, args.seed)
     print(f"[data] {len(X_data)} MNIST training images loaded")
 
-    params = MSNParams(Cm=args.Cm, tau_s1=args.tau_s, tau_s2=args.tau_s)
+    params = MSNParams(Cm=args.Cm)         # tau_s now lives on the synapse
     print(params.summary())
 
     net, P, G_E, G_I, syn_in_e, sp_E, sp_I = build_network(
         args.N,
         params      = params,
+        tau_s       = args.tau_s,
         w_jump      = args.w_jump,
         X_max       = args.X_max,
         theta_X     = args.theta_X,

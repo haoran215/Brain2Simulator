@@ -4,33 +4,13 @@ eval_msn_brian2.py
 Evaluate the trained 784→100 weight matrix on MNIST in the *real* Brian2
 MSN simulator. Each test image is presented for T seconds; pixels drive
 784 Poisson sources whose spikes feed 100 MSN neurons via signed synapses
-(positive weights → Is1_exc, negative → Is1_inh). The 100 outputs are
-partitioned into 10 groups of 10; the group with the highest spike count
-wins.
-
-This is the rate-regime classification experiment requested:
-    - 100 MSN neurons, partitioned 10 × 10 (one group per digit)
-    - Synaptic weights transferred from a PyTorch surrogate model
-    - Predict by argmax of group spike count over T_present
+(positive weights → I_exc inlet, negative → I_inh inlet). The 100 outputs
+are partitioned into 10 groups of 10; the group with the highest spike
+count wins.
 
 Usage
 -----
-    # 1) train the rate proxy (one-time, fast):
-    python Classification/train_pytorch.py --epochs 10
-
-    # 2) evaluate on Brian2:
-    python Classification/eval_msn_brian2.py --n 200
-
-Tunables that matter
---------------------
-    --T               presentation time per image (s).  Longer = better stats
-                      but slower. Default 0.5 s gives ~4 spikes/active neuron.
-    --lambda_max      max input Poisson rate (Hz) at pixel intensity 1.0.
-    --weight_scale    amps per unit of W. Trained W is dimensionless;
-                      multiply to get a current that lands in the MSN
-                      operating window (I_min ≈ 15 µA, I_max ≈ 100 µA).
-    --tau_s           synaptic cascade τ. Larger = smoother rate code but
-                      longer settling time.
+    python Classification-supervised/eval_msn_brian2.py --n 200
 """
 
 from __future__ import annotations
@@ -76,32 +56,56 @@ def load_mnist_test(n: int, data_dir: str, rng_seed: int) -> tuple[np.ndarray, n
 # Network
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _signed_synapse(source, target, target_var: str, tau_s: float, name: str):
+    """Build a Synapses object with the new cascade-on-synapse cascade,
+    writing Is2 into a named (summed) inlet on the post group.
+    Returns the Synapses (not yet connected; caller does syn.connect(...))."""
+    model = f"""
+        dIs1/dt = -Is1 / tau_s1                  : amp (clock-driven)
+        dIs2/dt = (-Is2 + Is1) / tau_s2          : amp (clock-driven)
+        {target_var}_post = Is2                  : amp (summed)
+        w : amp
+    """
+    syn = Synapses(source, target,
+                   model=model,
+                   on_pre='Is1 += w',
+                   method='euler',
+                   namespace={'tau_s1': tau_s*second, 'tau_s2': tau_s*second},
+                   name=name)
+    return syn
+
+
 def build_network(
     W: np.ndarray,                 # (N_HID, N_PIX), signed
     params: MSNParams,
     weight_scale: float,           # A per unit W
+    tau_s: float = 200e-3,         # synaptic cascade τ (s)
 ) -> tuple[Network, PoissonGroup, SpikeMonitor]:
-    """784 Poisson → 100 MSN.  W>0 routes to Is1_exc, W<0 to Is1_inh."""
+    """784 Poisson → 100 MSN.  W>0 routes to I_exc, W<0 to I_inh.
+
+    One exc Synapses group and one inh Synapses group target G — Pattern A.
+    """
     N_HID, N_PIX = W.shape
 
     P = PoissonGroup(N_PIX, rates=np.zeros(N_PIX) * Hz, name='inp')
-    G = make_msn(N_HID, params=params, name='msn_out')
+    G = make_msn(params=params, N=N_HID, name='msn_out')
     G.I_0 = 0 * amp                # all drive comes from synaptic input
 
-    # Source = pixel index (i in Brian2), Target = output index (j).
-    # W[k, p] is the weight pixel p → output k, so source=p, target=k.
-    pos = np.argwhere(W > 0)       # (M_pos, 2): columns = [k_out, p_in]
+    # W[k, p]: pixel p → output k.  Source = pixel (i), target = output (j).
+    pos = np.argwhere(W > 0)
     neg = np.argwhere(W < 0)
 
-    syn_e = Synapses(P, G, model='w : amp',
-                     on_pre='Is1_exc_post += w', name='syn_exc')
+    syn_e = _signed_synapse(P, G, target_var='I_exc', tau_s=tau_s, name='syn_exc')
     syn_e.connect(i=pos[:, 1].astype(int), j=pos[:, 0].astype(int))
     syn_e.w = W[pos[:, 0], pos[:, 1]] * weight_scale * amp
+    syn_e.Is1 = 0 * amp
+    syn_e.Is2 = 0 * amp
 
-    syn_i = Synapses(P, G, model='w : amp',
-                     on_pre='Is1_inh_post += w', name='syn_inh')
+    syn_i = _signed_synapse(P, G, target_var='I_inh', tau_s=tau_s, name='syn_inh')
     syn_i.connect(i=neg[:, 1].astype(int), j=neg[:, 0].astype(int))
     syn_i.w = (-W[neg[:, 0], neg[:, 1]]) * weight_scale * amp
+    syn_i.Is1 = 0 * amp
+    syn_i.Is2 = 0 * amp
 
     sp = SpikeMonitor(G, name='sp_out')
 
@@ -117,14 +121,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[2])
     ap.add_argument('--weights',      default='Classification/weights.npz')
     ap.add_argument('--data',         default='Classification/data')
-    ap.add_argument('--n',            type=int,   default=500,
-                    help='number of test images (default 500; full set is 10000)')
-    ap.add_argument('--T',            type=float, default=0.5,
-                    help='presentation time per image, in seconds')
-    ap.add_argument('--lambda_max',   type=float, default=200.0,
-                    help='Hz, peak Poisson rate per pixel')
-    ap.add_argument('--weight_scale', type=float, default=5e-7,
-                    help='A per unit weight (tune so I_in lies in MSN window)')
+    ap.add_argument('--n',            type=int,   default=500)
+    ap.add_argument('--T',            type=float, default=0.5)
+    ap.add_argument('--lambda_max',   type=float, default=200.0)
+    ap.add_argument('--weight_scale', type=float, default=5e-7)
     ap.add_argument('--tau_s',        type=float, default=200e-3,
                     help='synaptic cascade τ_s1 = τ_s2 (s)')
     ap.add_argument('--seed',         type=int,   default=0)
@@ -133,7 +133,7 @@ def main() -> None:
 
     seed(args.seed)
     np.random.seed(args.seed)
-    defaultclock.dt = 50 * us       # safe for τ_close ≈ 0.5 ms
+    defaultclock.dt = 50 * us
 
     # ── Load weights ─────────────────────────────────────────────────────────
     blob       = np.load(args.weights)
@@ -152,15 +152,14 @@ def main() -> None:
     print(f"loaded {len(X)} MNIST test images")
 
     # ── Build network ─────────────────────────────────────────────────────────
-    params = MSNParams(tau_s1=args.tau_s, tau_s2=args.tau_s)
+    params = MSNParams()          # tau_s now lives on the synapse
     print(params.summary())
 
-    net, P, sp = build_network(W, params, args.weight_scale)
+    net, P, sp = build_network(W, params, args.weight_scale, tau_s=args.tau_s)
     net.store('init')
 
     # Sanity check: typical input current to a hidden neuron under mean field.
-    # <I_i> ≈ Σ_p W[i,p] · pixel_p · λ_max · τ_s · weight_scale
-    h_mean = (W @ X.mean(axis=0))                  # (150,)
+    h_mean = (W @ X.mean(axis=0))
     I_mean = h_mean * args.lambda_max * args.tau_s * args.weight_scale
     I_min, I_max = params.operating_window()
     print(f"mean-field check: <I_in> ∈ [{I_mean.min()*1e6:+.1f}, "
@@ -182,7 +181,7 @@ def main() -> None:
 
         idx = np.asarray(sp.i[:])
         counts = np.bincount(idx, minlength=N_HID)
-        rates[k] = counts / args.T                        # Hz
+        rates[k] = counts / args.T
         grouped = counts.reshape(N_CLASSES, PER_CLASS).sum(axis=1)
         preds[k] = int(np.argmax(grouped))
 
@@ -201,7 +200,6 @@ def main() -> None:
     print(f"total simulation time: {total:.1f} s "
           f"({total/args.n*1e3:.1f} ms/trial)")
 
-    # ── Plots ────────────────────────────────────────────────────────────────
     plot_results(y, preds, rates, args, acc, ann_acc, params)
 
 
@@ -214,7 +212,7 @@ def plot_results(y, preds, rates, args, acc, ann_acc, params):
     for ti, pi in zip(y, preds):
         cm[ti, pi] += 1
 
-    grouped_rate = rates.reshape(-1, N_CLASSES, PER_CLASS).mean(axis=2)   # (n, 10)
+    grouped_rate = rates.reshape(-1, N_CLASSES, PER_CLASS).mean(axis=2)
     rate_by_true = np.zeros((N_CLASSES, N_CLASSES))
     for c in range(N_CLASSES):
         m = (y == c)
@@ -223,7 +221,6 @@ def plot_results(y, preds, rates, args, acc, ann_acc, params):
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.8))
 
-    # Confusion matrix
     ax = axes[0]
     im = ax.imshow(cm, cmap='Blues')
     ax.set_xticks(range(N_CLASSES)); ax.set_yticks(range(N_CLASSES))
@@ -237,7 +234,6 @@ def plot_results(y, preds, rates, args, acc, ann_acc, params):
                     fontsize=9)
     fig.colorbar(im, ax=ax, fraction=0.045)
 
-    # Mean firing rate of each output group, conditioned on true digit
     ax = axes[1]
     im = ax.imshow(rate_by_true, cmap='magma')
     ax.set_xticks(range(N_CLASSES)); ax.set_yticks(range(N_CLASSES))

@@ -111,23 +111,24 @@ def build():
     defaultclock.dt = DT
 
     # Cm = 0.05 µF lifts MSN max rate to ~200 Hz so STDP gets enough post-
-    # spikes per pairing window. Same trick as train_stdp.py.
-    params = MSNParams(Cm=0.05e-6, tau_s1=TAU_S, tau_s2=TAU_S)
+    # spikes per pairing window. tau_s now lives on the synapse.
+    params = MSNParams(Cm=0.05e-6)
 
     P = PoissonGroup(N_PRE, rates=np.zeros(N_PRE) * Hz, name='pre')
-    G = make_msn(N_POST, params=params, name='post')
-    # Tonic bias just below I_min ≈ 15 µA so even a small synaptic kick
-    # tips post over threshold. With 5 pre at 50 Hz the cascade alone
-    # would only reach a few µA in the pair window — this lift fixes that.
+    G = make_msn(params=params, N=N_POST, name='post')
     G.I_0 = I_0_BIAS * amp
 
+    # STDP synapse with cascade in the model block.
     stdp_model = '''
-        w : 1
+        dIs1/dt   = -Is1 / tau_s1                : amp (clock-driven)
+        dIs2/dt   = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+        I_exc_post = Is2                         : amp (summed)
+        w         : 1
         dapre/dt  = -apre /tau_pre  : 1 (event-driven)
         dapost/dt = -apost/tau_post : 1 (event-driven)
     '''
     on_pre = '''
-        Is1_exc_post += w * w_unit
+        Is1 += w * w_unit
         apre += 1
         w = clip(w - eta_pre * apost, 0, w_max)
     '''
@@ -138,7 +139,10 @@ def build():
     syn = Synapses(
         P, G,
         model=stdp_model, on_pre=on_pre, on_post=on_post,
+        method='euler',
         namespace=dict(
+            tau_s1   = TAU_S    * second,
+            tau_s2   = TAU_S    * second,
             tau_pre  = TAU_PRE  * second,
             tau_post = TAU_POST * second,
             w_unit   = W_UNIT   * amp,
@@ -151,6 +155,8 @@ def build():
         name='syn',
     )
     syn.connect(True)
+    syn.Is1 = 0 * amp
+    syn.Is2 = 0 * amp
 
     syn_i = np.array(syn.i[:], dtype=np.int64)        # pre index
     syn_j = np.array(syn.j[:], dtype=np.int64)        # post index

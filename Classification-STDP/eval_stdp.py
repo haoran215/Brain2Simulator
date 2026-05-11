@@ -62,33 +62,56 @@ def load_mnist(split: str, n: int, data_dir: str, rng_seed: int):
 
 
 def build_frozen_network(W: np.ndarray, theta: np.ndarray, cfg: dict):
-    """Same topology as training but plastic synapses are frozen
-    (model='w : amp', no on_post)."""
+    """Same topology as training but plastic synapses are frozen (no on_post).
+    Cascade lives on every Synapses object."""
     N = W.shape[0]
-    params = MSNParams(tau_s1=cfg['tau_s'], tau_s2=cfg['tau_s'])
+    Cm = cfg.get('Cm', 10e-7)
+    params = MSNParams(Cm=Cm)
+    tau_s = cfg['tau_s']
 
     P = PoissonGroup(784, rates=np.zeros(784) * Hz, name='inp')
-    G_E = make_msn(N, params=params, name='E')
-    G_I = make_msn(N, params=params, name='I')
+    G_E = make_msn(params=params, N=N, name='E')
+    G_I = make_msn(params=params, N=N, name='I')
     G_E.I_0 = (-theta) * amp                     # carry over learned θ
     G_I.I_0 = 0 * amp
 
-    syn_in_e = Synapses(P, G_E, model='w : amp',
-                        on_pre='Is1_exc_post += w', name='syn_in_e')
+    def _cascade(target_var):
+        return f"""
+            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+            {target_var}_post = Is2                : amp (summed)
+            w : amp
+        """
+
+    ns = {'tau_s1': tau_s*second, 'tau_s2': tau_s*second}
+
+    syn_in_e = Synapses(P, G_E, model=_cascade('I_exc'),
+                        on_pre='Is1 += w', method='euler',
+                        namespace=ns, name='syn_in_e')
     syn_in_e.connect(True)
     syn_i = np.array(syn_in_e.i[:], dtype=np.int64)
     syn_j = np.array(syn_in_e.j[:], dtype=np.int64)
     # STDP run uses w_unit; BSF run uses w_jump (binary readout already in W).
     w_scale = cfg.get('w_unit', cfg.get('w_jump', 1.0))
     syn_in_e.w = (W[syn_j, syn_i] * w_scale) * amp
+    syn_in_e.Is1 = 0 * amp
+    syn_in_e.Is2 = 0 * amp
 
-    syn_e_i = Synapses(G_E, G_I, on_pre=f"Is1_exc_post += {cfg['w_e2i']}*amp",
-                       name='syn_e_i')
+    syn_e_i = Synapses(G_E, G_I, model=_cascade('I_exc'),
+                       on_pre='Is1 += w', method='euler',
+                       namespace=ns, name='syn_e_i')
     syn_e_i.connect(j='i')
+    syn_e_i.w = cfg['w_e2i'] * amp
+    syn_e_i.Is1 = 0 * amp
+    syn_e_i.Is2 = 0 * amp
 
-    syn_i_e = Synapses(G_I, G_E, on_pre=f"Is1_inh_post += {cfg['w_i2e']}*amp",
-                       name='syn_i_e')
+    syn_i_e = Synapses(G_I, G_E, model=_cascade('I_inh'),
+                       on_pre='Is1 += w', method='euler',
+                       namespace=ns, name='syn_i_e')
     syn_i_e.connect(condition='i != j')
+    syn_i_e.w = cfg['w_i2e'] * amp
+    syn_i_e.Is1 = 0 * amp
+    syn_i_e.Is2 = 0 * amp
 
     sp_E = SpikeMonitor(G_E, name='sp_E')
 
