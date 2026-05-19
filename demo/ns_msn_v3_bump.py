@@ -4,7 +4,6 @@ ns_msn_v3_bump.py
 Single MSN + one self-excitatory synapse — minimal "bump" test.
 
 Inheritance:
-  msn_lib.py            — compact module: MSNParams, make_msn, make_synapse
   ns_msn_v2_synapses.py — multi-neuron + Poisson, no recurrence
 
   THIS FILE:
@@ -20,18 +19,22 @@ Behaviour we expect (the bump):
          →  recurrent current eventually decays  →  firing stops
          →  bump dissipated.
 
-Key tuning ratio (see msn_lib.py §6):
+Key tuning ratio:
   Iw_recur · f · τ_s    vs    I_min − I_0
       LARGER  → persistent firing (latched)
       SMALLER → bump fades (this file targets here, slightly subcritical)
 """
 #%%
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from brian2 import *
-from msn_lib import MSNParams, make_msn, make_synapse
+from msn_neuron  import MSNParams, make_msn
+from msn_synapse import SynapseParams, make_synapse
 
 prefs.codegen.target = 'numpy'   # pure-Python backend, avoids C++ compiler
 defaultclock.dt = 10*us
@@ -42,7 +45,7 @@ tau_s_val = 200e-3                        # synapse cascade τ (s)
 print(params.summary())
 I_min, I_max = params.operating_window()
 
-I_0_val      = 0.95 * I_min     # 90% of rheobase — silent on its own
+I_0_val      = 0.75 * I_min     # 90% of rheobase — silent on its own
 I_pulse_val  = 0.3 * I_min     # 1s boost: I_0 + I_pulse = 1.05·I_min
 Iw_recur_val = 50e-7            # self-excitation sustains firing after pulse
 t_pulse      = 2.0*second       # let Vm settle before triggering
@@ -50,14 +53,14 @@ t_pulse_dur  = 1.0*second       # pulse duration
 T_run        = 12.0*second
 
 # ─── Build neuron + self-excitatory synapse ───────────────────────────────────
-neuron = make_msn(params=params, name='msn_pop')
+neuron = make_msn(N=1, params=params, name='msn_pop')
 neuron.I_0 = I_0_val * amp
 
 # Cascade τ now lives on the synapse, not the neuron.
 syn_recur = make_synapse(
     source=neuron, target=neuron,
-    kind='exc', weight=Iw_recur_val,
-    tau_s1=tau_s_val, tau_s2=tau_s_val,
+    params=SynapseParams(kind='exc', weight=Iw_recur_val,
+                         tau_s1=tau_s_val, tau_s2=tau_s_val),
     connect='i == j', name='syn_recur',
 )
 

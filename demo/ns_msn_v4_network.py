@@ -5,7 +5,6 @@ Small recurrent network of 20 MSN neurons — proof that the modular code
 (msn_lib.py) scales beyond a single cell.
 
 Inheritance:
-  msn_lib.py             — MSNParams, make_msn, make_synapse
   ns_msn_v3_bump.py      — single neuron + self-loop  (passed → scale up)
   THIS FILE              — N=20 ring with local recurrent excitation
 
@@ -31,13 +30,17 @@ Inheritance:
   case) to land in the same operating regime.
 """
 
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from brian2 import *
-from msn_lib import MSNParams, make_msn, make_synapse
+from msn_neuron  import MSNParams, make_msn
+from msn_synapse import SynapseParams, make_synapse
 
 seed(42)
 defaultclock.dt = 10*us
@@ -71,8 +74,8 @@ ring_cond = (
 )
 syn_recur = make_synapse(
     source=neurons, target=neurons,
-    kind='exc', weight=Iw_recur_val,
-    tau_s1=tau_s_val, tau_s2=tau_s_val,
+    params=SynapseParams(kind='exc', weight=Iw_recur_val,
+                         tau_s1=tau_s_val, tau_s2=tau_s_val),
     connect=ring_cond, name='ring_recur',
 )
 print(f"Recurrent edges: {len(syn_recur)}  (expected 4·N = {4*N})")

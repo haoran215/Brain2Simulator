@@ -2,16 +2,6 @@
 ns_msn_rc_demo.py
 =================
 
-⚠️  NEEDS REWORK — does not run under the current msn_neuron / msn_synapse
-    refactor.  The cascade ODE moved from the neuron to the synapse and
-    Brian2's `(summed)` semantics now allow only ONE exc Synapses object
-    per target group.  This demo fans into one reservoir group with THREE
-    exc Synapses (syn_rec + syn_in_L + syn_in_R) and uses the old raw
-    `on_pre='Is1_exc_post += w'` pattern (Is1_exc no longer exists on the
-    neuron).  Port plan: merge L+R inputs into the reservoir self-Synapses
-    by combining sources, or add named per-pathway inlets to MSN_EQS.
-    Not in the critical path for the 2E+1I motif experiment.
-
 Reservoir Computing (RC) demo — left vs right pattern classification
 with 20 MSN neurons.
 
@@ -52,6 +42,10 @@ Trial structure (ms)
   Feature window: 200–400 ms  (avoid Is2 onset transient)
 """
 #%%
+import os, sys
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _REPO)
+
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -89,17 +83,21 @@ bg_rate     =   5.0  # Hz — background noise (keep well below threshold)
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ 1. Load parameters                                                      ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
-params = MSNParams.from_json('configs/neuron_default.json')
+params = MSNParams.from_json(os.path.join(_REPO, 'configs/neuron_default.json'))
 I_min, I_max = params.operating_window()
 
-syn_exc_p = SynapseParams.from_json('configs/synapse_default.json', key='exc')
+syn_exc_p = SynapseParams.from_json(os.path.join(_REPO, 'configs/synapse_default.json'), key='exc')
 print(params.summary(), '\n')
 print(f"I_min = {I_min*1e6:.2f} µA")
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ 2. Build reservoir (20 MSN neurons, all subthreshold)                   ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
-reservoir = make_msn(N=N, params=params, name='reservoir')
+# Three named inlets — one per Synapses writer (Brian2 allows only one writer
+# per (inlet, group) pair).  I_exc_rec: recurrent, I_exc_L / I_exc_R: inputs.
+reservoir = make_msn(N=N, params=params,
+                     exc_inlets=('I_exc_rec', 'I_exc_L', 'I_exc_R'),
+                     name='reservoir')
 # Tonic bias: subthreshold on its own, but crosses I_min when Poisson input
 # arrives.  Rule: I_0 + <Is2_bg> < I_min  AND  I_0 + Is2(200ms) > I_min.
 # I_0 = 0.7 × I_min, bg gives ~0.5 µA Is2, so total_bg ≈ 0.705 × I_min < I_min ✓
@@ -122,7 +120,9 @@ if not USE_STDP:
     syn_rec = make_synapse(
         source  = reservoir,
         target  = reservoir,
-        params  = syn_exc_p,
+        params  = SynapseParams(kind='exc', weight=syn_exc_p.weight,
+                                tau_s1=syn_exc_p.tau_s1, tau_s2=syn_exc_p.tau_s2,
+                                target_var='I_exc_rec'),
         connect = 'rand() < 0.15 and i != j',   # ~15% sparse, no self-loops
         name    = 'syn_rec',
     )
@@ -158,12 +158,15 @@ else:
     syn_rec = Synapses(
         reservoir, reservoir,
         model = '''
-            w        : amp
-            dApre/dt  = -Apre  / tau_pre  : 1 (event-driven)
-            dApost/dt = -Apost / tau_post : 1 (event-driven)
+            w                    : amp
+            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
+            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
+            I_exc_rec_post = Is2                   : amp (summed)
+            dApre/dt  = -Apre  / tau_pre           : 1 (event-driven)
+            dApost/dt = -Apost / tau_post          : 1 (event-driven)
         ''',
         on_pre  = '''
-            Is1_exc_post += w
+            Is1   += w
             Apre  += 1
             w      = clip(w - Apost * lr_minus, 0*amp, w_max)
         ''',
@@ -172,12 +175,16 @@ else:
             w      = clip(w + Apre  * lr_plus,  0*amp, w_max)
         ''',
         namespace = dict(
+            tau_s1=syn_exc_p.tau_s1 * second,
+            tau_s2=syn_exc_p.tau_s2 * second,
             tau_pre=tau_pre, tau_post=tau_post,
             lr_plus=lr_plus, lr_minus=lr_minus, w_max=w_max,
         ),
         name = 'syn_rec',
     )
     syn_rec.connect(condition='rand() < 0.15 and i != j')
+    syn_rec.Is1 = 0 * amp
+    syn_rec.Is2 = 0 * amp
 
     # Same random init as the static case — plasticity STARTS from random,
     # not from a fixed value.
@@ -207,21 +214,30 @@ input_R = PoissonGroup(N_RIGHT, rates=0*Hz, name='input_R')
 #       I_0 + <Is2_bg_ss> < I_min
 #       0.7·I_min + Iw·bg_rate·tau_s2 < I_min
 #       Iw < 0.3·I_min / (bg_rate·tau_s2) = 0.3×14.99e-6/(5×0.2) = 4.5 µA ✓
-inp_params = SynapseParams(weight=2e-6, kind='exc', delay=0.0)
+# Each input synapse writes to its own named inlet — syn_in_L → I_exc_L,
+# syn_in_R → I_exc_R — to satisfy Brian2's one-summed-writer-per-inlet rule.
+inp_w   = 2e-6
+inp_tau = syn_exc_p.tau_s2   # reuse exc cascade timescale for both inputs
 I_0_val = 0.7 * I_min
-print(f"\nInput Iw = {inp_params.weight*1e6:.1f} µA,  "
+print(f"\nInput Iw = {inp_w*1e6:.1f} µA,  "
       f"I_0 = {I_0_val*1e6:.2f} µA ({I_0_val/I_min*100:.0f}% of I_min)")
-print(f"ON-side  at 200ms: {I_0_val*1e6 + 0.264*(inp_params.weight*stim_rate*params.tau_s2)*1e6:.1f} µA "
-      f"({'above' if I_0_val + 0.264*inp_params.weight*stim_rate*params.tau_s2 > I_min else 'BELOW'} I_min)")
-print(f"OFF-side bg ss:    {I_0_val*1e6 + inp_params.weight*bg_rate*params.tau_s2*1e6:.1f} µA "
-      f"({'above' if I_0_val + inp_params.weight*bg_rate*params.tau_s2 > I_min else 'below'} I_min)\n")
+print(f"ON-side  at 200ms: {I_0_val*1e6 + 0.264*(inp_w*stim_rate*inp_tau)*1e6:.1f} µA "
+      f"({'above' if I_0_val + 0.264*inp_w*stim_rate*inp_tau > I_min else 'BELOW'} I_min)")
+print(f"OFF-side bg ss:    {I_0_val*1e6 + inp_w*bg_rate*inp_tau*1e6:.1f} µA "
+      f"({'above' if I_0_val + inp_w*bg_rate*inp_tau > I_min else 'below'} I_min)\n")
 
-# input_L neuron i  →  reservoir neuron i       (0 to N_LEFT-1)
-# input_R neuron i  →  reservoir neuron i+N_LEFT (N_LEFT to N-1)
-syn_in_L = make_synapse(input_L, reservoir, inp_params,
+# input_L neuron i  →  reservoir neuron i         (0 to N_LEFT-1)
+# input_R neuron i  →  reservoir neuron i+N_LEFT   (N_LEFT to N-1)
+syn_in_L = make_synapse(input_L, reservoir,
+                        SynapseParams(kind='exc', weight=inp_w,
+                                      tau_s1=syn_exc_p.tau_s1, tau_s2=syn_exc_p.tau_s2,
+                                      target_var='I_exc_L'),
                         connect='j == i',
                         name='syn_in_L')
-syn_in_R = make_synapse(input_R, reservoir, inp_params,
+syn_in_R = make_synapse(input_R, reservoir,
+                        SynapseParams(kind='exc', weight=inp_w,
+                                      tau_s1=syn_exc_p.tau_s1, tau_s2=syn_exc_p.tau_s2,
+                                      target_var='I_exc_R'),
                         connect='j == i + %d' % N_LEFT,
                         name='syn_in_R')
 

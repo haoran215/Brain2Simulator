@@ -60,7 +60,7 @@ class SynapseParams:
                exc_inlets=..., inh_inlets=...).
     """
 
-    weight:     float       = 6e-6     # A
+    weight:     float       = 10e-6     # A
     kind:       str         = 'exc'    # 'exc' | 'inh'
     tau_s1:     float       = 200e-3   # s
     tau_s2:     float       = 200e-3   # s

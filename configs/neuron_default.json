@@ -1,11 +1,13 @@
 {
-  "_units": "All values in SI: F, Ohm, V, A",
-  "_source": "Wu et al. 2023, Fig. 2 — paper-faithful defaults",
-  "_note": "tau_s1/tau_s2 moved to synapse configs (msn_synapse.SynapseParams)",
-  "Cm":     1e-6,
-  "Ra":     47.0,
-  "Rm_hi":  100000.0,
-  "Rm_lo":  500.0,
-  "Vth":    1.5,
-  "I_hold": 1e-4
+  "_description": "MSN hardware parameters calibrated to 35-device P0118MA dataset (All_Sample.json, Dec 2025).",
+  "_units": "SI — F, Ohm, V, A, s",
+  "_Rm_hi_note": "60 kOhm is the effective off-state membrane resistance (thyristor anode-cathode off-state impedance). NOT the 680 kOhm gate-to-anode resistor.",
+  "_Vth_note": "2.0 V is the spike threshold on Vm. Approximately equal to Vout peak since Rm_lo~0. Dataset mean=1.73V, std=0.56V, range=[1.1, 2.8] V.",
+  "_I_hold_note": "77 uA is the median I_sat from 35 devices (range 56.8-109.5 uA).",
+  "Cm": 1e-7,
+  "Ra": 2200.0,
+  "Rm_hi": 60000.0,
+  "Rm_lo": 10.0,
+  "Vth": 2.0,
+  "I_hold": 7.7e-05
 }

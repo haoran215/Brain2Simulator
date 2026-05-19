@@ -44,6 +44,10 @@ Inheritance
   configs/         — JSON parameter files
 """
 #%%
+import os, sys
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _REPO)
+
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -68,7 +72,7 @@ defaultclock.dt = 10 * us
 # ── Neurons ──────────────────────────────────────────────────────────────────
 # Both neurons share the same hardware spec (same JSON file).
 # Different populations would load different files.
-neuron_params = MSNParams.from_json('configs/neuron_default.json')
+neuron_params = MSNParams.from_json(os.path.join(_REPO, 'configs/neuron_default.json'))
 print(neuron_params.summary())
 
 I_min, I_max = neuron_params.operating_window()
@@ -76,18 +80,23 @@ print(f"\n  I_min (rheobase)     = {I_min*1e6:.3f} µA")
 print(f"  I_max (depol block)  = {I_max*1e6:.0f} µA\n")
 
 # ── Synapses ─────────────────────────────────────────────────────────────────
-inh_params = SynapseParams.from_json('configs/synapse_default.json', key='inh')
-exc_params  = SynapseParams.from_json('configs/synapse_default.json', key='exc')
+_inh_base  = SynapseParams.from_json(os.path.join(_REPO, 'configs/synapse_default.json'), key='inh')
+# JSON weight (10 µA) is too large for this N=2 WTA.  At D1 ≈ 1.01·I_min,
+# N1 fires at ~35 Hz.  Steady-state I_inh ≈ Iw·f·τ_s1.
+# For N2 to fire at D2_on despite N1's inhibition:
+#   D2_on - Iw·f1·τ_s1 > I_min  →  Iw < I_min/(f1·τ_s1) ≈ 4.6 µA.
+# Use 2 µA for a clear margin; keep τ from JSON.
+inh_params = SynapseParams(kind='inh', weight=1e-6,
+                           tau_s1=_inh_base.tau_s1, tau_s2=_inh_base.tau_s2)
 print(inh_params.summary())
-print(exc_params.summary(), '\n')
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ 2. Build neuron populations                                             ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 # Separate NeuronGroups so each has a readable name.
-N1 = make_msn(params=neuron_params, name='N1')
-N2 = make_msn(params=neuron_params, name='N2')
+N1 = make_msn(N=1, params=neuron_params, name='N1')
+N2 = make_msn(N=1, params=neuron_params, name='N2')
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -101,9 +110,9 @@ N2 = make_msn(params=neuron_params, name='N2')
 #   I_min < I_0 < I_max  → spontaneously firing
 #   I_0 > I_max          → depolarisation block (avoid)
 
-D1 = 1.3 * I_min          # 19.5 µA — N1 fires spontaneously at ~7 Hz
+D1 = 1.1 * I_min          # µA — N1 fires spontaneously on its own
 D2_off = 0.0              # µA — N2 silent on its own
-D2_on  = 3.3 * I_min      # 49.5 µA — N2 fires fast when switched on
+D2_on  = 1.2 * I_min      # µA — N2 strongly driven during pulse, wins over N1's spontaneous firing
 
 N1.I_0 = D1      * amp    # constant; never changes
 N2.I_0 = D2_off  * amp    # starts silent; boosted by (b) below
@@ -347,7 +356,7 @@ fig.suptitle(
     'Phase 3: N2 off, N1 recovers',
     fontsize=12, fontweight='bold', y=1.002)
 
-out_path = 'demo/ns_msn_wta_demo.png'
+out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ns_msn_wta_demo.png')
 plt.savefig(out_path, dpi=150, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 
@@ -369,7 +378,7 @@ print(f"\nFigure saved → {out_path}")
 #       name    = 'syn_bg_N2',
 #   )
 #   # Steady-state extra drive: <Is2_exc> ≈ weight * rate * tau_s2
-#   #   = 6e-6 A * 200 Hz * 0.2 s = 240 µA  (very strong — reduce weight or rate)
+#   #   = 10e-6 A * 200 Hz * 0.2 s = 400 µA  (very strong — reduce weight or rate)
 #   # Tune either exc_params.weight or the Poisson rate until the desired
 #   # mean drive lands in (I_min, I_max).
 #
