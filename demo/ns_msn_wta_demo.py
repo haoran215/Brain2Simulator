@@ -110,9 +110,9 @@ N2 = make_msn(N=1, params=neuron_params, name='N2')
 #   I_min < I_0 < I_max  → spontaneously firing
 #   I_0 > I_max          → depolarisation block (avoid)
 
-D1 = 1.1 * I_min          # µA — N1 fires spontaneously on its own
+D1 = 1.2 * I_min          # µA — N1 fires spontaneously on its own
 D2_off = 0.0              # µA — N2 silent on its own
-D2_on  = 1.2 * I_min      # µA — N2 strongly driven during pulse, wins over N1's spontaneous firing
+D2_on  = 1.6 * I_min      # µA — N2 strongly driven during pulse, wins over N1's spontaneous firing
 
 N1.I_0 = D1      * amp    # constant; never changes
 N2.I_0 = D2_off  * amp    # starts silent; boosted by (b) below

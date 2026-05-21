@@ -89,7 +89,7 @@ class MSNParams:
     Rm_hi:  float = 60_000.0  # Ω     (60 kΩ effective off-state)
     Rm_lo:  float = 10.0      # Ω     (thyristor ~short when conducting)
     Vth:    float = 2.0       # V     (threshold; ≈ Vout peak amplitude)
-    I_hold: float = 80e-6     # A     (80 µA, median I_sat 35-device set)
+    I_hold: float = 100e-6    # A     (100 µA, median I_sat 35-device set)
 
     # ── JSON I/O ──────────────────────────────────────────────────────────────
 
