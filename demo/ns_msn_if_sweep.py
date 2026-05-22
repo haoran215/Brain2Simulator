@@ -140,8 +140,8 @@ t_open_a  = np.array(t_open_a) * 1e3
 t_close_a = np.array(t_close_a) * 1e3
 
 # ─── Plot ────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(16, 6),
-                         gridspec_kw=dict(wspace=0.30))
+fig, axes = plt.subplots(2, 1, figsize=(6, 10),
+                         gridspec_kw=dict(wspace=1))
 
 # Left: I-F curve
 ax = axes[0]

@@ -51,6 +51,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 from brian2 import *
 
 from msn_neuron  import MSNParams, make_msn
@@ -59,7 +60,7 @@ from msn_synapse import SynapseParams, make_synapse
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ 0. Config                                                               ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
-USE_STDP = False    # True → reservoir weights self-update via STDP (slower)
+USE_STDP = True    # True → reservoir weights self-update via STDP (slower)
 
 prefs.codegen.target = 'numpy'
 start_scope()
@@ -341,7 +342,104 @@ if acc_test < 0.7:
           "Try reducing I_min (lower Vth) or increasing inp_params.weight.")
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║ 10. Plot                                                                ║
+# ║ 10. Training diagram                                                    ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+fig = plt.figure(figsize=(15.8, 7.2))
+fig.patch.set_facecolor('white')
+gs_diag = fig.add_gridspec(2, 3, height_ratios=[1.0, 0.62], hspace=0.24, wspace=0.18)
+
+ax_a = fig.add_subplot(gs_diag[0, 0])
+ax_b = fig.add_subplot(gs_diag[0, 1])
+ax_c = fig.add_subplot(gs_diag[0, 2])
+ax_d = fig.add_subplot(gs_diag[1, :])
+
+for axp in (ax_a, ax_b, ax_c, ax_d):
+    axp.set_axis_off()
+    axp.set_xlim(0, 1)
+    axp.set_ylim(0, 1)
+
+def box(axp, xy, w, h, text, fc='white', ec='0.2', text_color='0.1', fontsize=11, lw=1.4):
+    patch = FancyBboxPatch(
+    xy, w, h,
+    boxstyle='round,pad=0.015,rounding_size=0.02',
+    linewidth=lw, edgecolor=ec, facecolor=fc,
+    )
+    axp.add_patch(patch)
+    axp.text(xy[0] + w / 2, xy[1] + h / 2, text,
+         ha='center', va='center', fontsize=fontsize,
+         color=text_color, weight='bold')
+
+def arrow(axp, p0, p1, color='0.25', text=None, text_pos=None, text_color='0.2', rad=0.0):
+    style = '-|>'
+    conn = f'arc3,rad={rad}' if rad else 'arc3'
+    a = FancyArrowPatch(
+        p0,
+        p1,
+        arrowstyle=style,
+        mutation_scale=14,
+        linewidth=1.6,
+        color=color,
+        connectionstyle=conn,
+    )
+    axp.add_patch(a)
+    if text is not None and text_pos is not None:
+        axp.text(
+            text_pos[0],
+            text_pos[1],
+            text,
+            ha='center',
+            va='center',
+            fontsize=9.2,
+            color=text_color,
+        )
+
+# Panel A
+box(ax_a, (0.04, 0.14), 0.26, 0.72, 'A\nInput signals', fc='#f7f7f7', ec='0.25', fontsize=12)
+box(ax_a, (0.42, 0.64), 0.22, 0.12, 'Left trials', fc='#e8f1fb', ec='#2E86C1', text_color='#1f4e79', fontsize=9.2)
+box(ax_a, (0.42, 0.43), 0.22, 0.12, 'Right trials', fc='#fdebe9', ec='#C0392B', text_color='#7f1d1d', fontsize=9.2)
+box(ax_a, (0.42, 0.22), 0.22, 0.12, 'Background noise', fc='#f2f2f2', ec='0.55', text_color='0.25', fontsize=9.0)
+arrow(ax_a, (0.30, 0.70), (0.42, 0.70), color='#2E86C1', text='Poisson input', text_pos=(0.36, 0.83), text_color='#2E86C1')
+arrow(ax_a, (0.30, 0.49), (0.42, 0.49), color='#C0392B', text='Poisson input', text_pos=(0.36, 0.62), text_color='#C0392B')
+arrow(ax_a, (0.30, 0.28), (0.42, 0.28), color='0.5', text='background', text_pos=(0.36, 0.12))
+ax_a.text(0.5, 0.94, 'Input coding', ha='center', va='center', fontsize=11.5, weight='bold')
+
+# Panel B
+box(ax_b, (0.04, 0.14), 0.26, 0.72, 'B\nMSN reservoir', fc='#f7f7f7', ec='0.25', fontsize=12)
+box(ax_b, (0.40, 0.66), 0.20, 0.11, '20 MSN neurons', fc='#eef8f5', ec='#16A085', text_color='#0b5345', fontsize=9.2)
+box(ax_b, (0.40, 0.43), 0.20, 0.13, 'Random / STDP\nrecurrent weights', fc='#eef8f5', ec='#16A085', text_color='#0b5345', fontsize=8.8)
+box(ax_b, (0.40, 0.20), 0.20, 0.13, 'Spike counts\nfeature vector X', fc='#eef8f5', ec='#16A085', text_color='#0b5345', fontsize=8.8)
+arrow(ax_b, (0.30, 0.71), (0.40, 0.71), color='#16A085')
+arrow(ax_b, (0.30, 0.49), (0.40, 0.49), color='#16A085')
+arrow(ax_b, (0.30, 0.26), (0.40, 0.26), color='#16A085')
+arrow(ax_b, (0.60, 0.53), (0.64, 0.53), color='#95a5a6', rad=0.55)
+ax_b.text(0.5, 0.94, 'Reservoir dynamics', ha='center', va='center', fontsize=11.5, weight='bold')
+
+# Panel C
+box(ax_c, (0.04, 0.14), 0.26, 0.72, 'C\nReadout and output', fc='#f7f7f7', ec='0.25', fontsize=12)
+box(ax_c, (0.40, 0.66), 0.20, 0.11, 'Ridge regression', fc='#fff4e6', ec='#D68910', text_color='#7a4d00', fontsize=9.2)
+box(ax_c, (0.40, 0.43), 0.20, 0.13, 'W_out = (X^T X + λI)^-1\nX^T y', fc='#fff4e6', ec='#D68910', text_color='#7a4d00', fontsize=8.9)
+box(ax_c, (0.40, 0.20), 0.20, 0.13, 'Left / Right\nclassification', fc='#fdecea', ec='#C0392B', text_color='#7f1d1d', fontsize=9.3)
+arrow(ax_c, (0.30, 0.71), (0.40, 0.71), color='#D68910', text='offline fit', text_pos=(0.35, 0.84), text_color='#7a4d00')
+arrow(ax_c, (0.30, 0.49), (0.40, 0.49), color='#D68910', text='predict', text_pos=(0.35, 0.62), text_color='#7a4d00')
+ax_c.text(0.5, 0.94, 'Supervised decoding', ha='center', va='center', fontsize=11.5, weight='bold')
+
+# Panel D: STDP mechanism + pipeline note
+box(ax_d, (0.03, 0.20), 0.28, 0.54, 'If USE_STDP = True:\nBrian2 updates recurrent\nweights online', fc='#f7f7f7', ec='0.25', fontsize=10.0)
+box(ax_d, (0.37, 0.20), 0.23, 0.54, 'on_pre\nApre += 1\nw -= Apost · lr_minus', fc='#eef8f5', ec='#16A085', text_color='#0b5345', fontsize=9.5)
+box(ax_d, (0.65, 0.20), 0.23, 0.54, 'on_post\nApost += 1\nw += Apre · lr_plus', fc='#eef8f5', ec='#16A085', text_color='#0b5345', fontsize=9.5)
+box(ax_d, (0.05, 0.06), 0.88, 0.08,
+    'Default flow: collect reservoir activity first, then train the readout offline with ridge regression.  '
+    'STDP is only for recurrent weights during the run.',
+    fc='white', ec='0.85', text_color='0.2', fontsize=8.9, lw=1.0)
+arrow(ax_d, (0.31, 0.48), (0.37, 0.48), color='#16A085', text='pre spike', text_pos=(0.34, 0.64), text_color='#0b5345')
+arrow(ax_d, (0.60, 0.48), (0.65, 0.48), color='#16A085', text='post spike', text_pos=(0.625, 0.64), text_color='#0b5345')
+
+diagram_path = 'demo/ns_msn_rc_training_diagram.png'
+plt.savefig(diagram_path, dpi=200, bbox_inches='tight')
+print(f"Training diagram saved → {diagram_path}")
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║ 11. Plot                                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 fig = plt.figure(figsize=(18, 14))
 gs  = gridspec.GridSpec(3, 2, figure=fig, hspace=0.50, wspace=0.35)

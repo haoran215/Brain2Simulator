@@ -41,13 +41,13 @@ defaultclock.dt = 10*us
 
 # ─── Parameters ──────────────────────────────────────────────────────────────
 params = MSNParams()                      # intrinsic params (no tau here)
-tau_s_val = 300e-3                        # synapse cascade τ (s)
+tau_s_val = 200e-3                        # synapse cascade τ (s)
 print(params.summary())
 I_min, I_max = params.operating_window()
 
-I_0_val      = 0.6 * I_min     # tonic bias current, just below rheobase (silent on its own)
-I_pulse_val  = 0.45 * I_min     # 1s boost: I_0 + I_pulse
-Iw_recur_val = 45e-7            # self-excitation sustains firing after pulse
+I_0_val      = 0.4 * I_min     # tonic bias current, just below rheobase (silent on its own)
+I_pulse_val  = 0.65 * I_min     # 1s boost: I_0 + I_pulse
+Iw_recur_val = 15e-7            # self-excitation sustains firing after pulse
 t_pulse      = 2.0*second       # let Vm settle before triggering
 t_pulse_dur  = 0.5*second       # pulse duration
 T_run        = 10.0*second
