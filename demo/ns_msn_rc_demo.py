@@ -60,13 +60,13 @@ from msn_synapse import SynapseParams, make_synapse
 # ╔══════════════════════════════════════════════════════════════════════════╗
 # ║ 0. Config                                                               ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
-USE_STDP = True    # True → reservoir weights self-update via STDP (slower)
+USE_STDP = os.environ.get('USE_STDP', 'True') == 'True'   # env-overridable; True → reservoir weights self-update via STDP (slower)
 
-prefs.codegen.target = 'numpy'
+prefs.codegen.target = 'cython'  # use Cython for speed (pip install Cython if you don't have it)
 start_scope()
 defaultclock.dt = 10 * us
 
-np.random.seed(42)
+np.random.seed(55)
 
 N           = 20
 N_LEFT      = 10     # neurons 0–9   = "left" neurons
@@ -175,6 +175,8 @@ else:
             Apost += 1
             w      = clip(w + Apre  * lr_plus,  0*amp, w_max)
         ''',
+        method = 'euler',   # NOT 'exact': the cascade's exact solver divides
+                            # by (tau_s2 - tau_s1), which is 0 when they're equal.
         namespace = dict(
             tau_s1=syn_exc_p.tau_s1 * second,
             tau_s2=syn_exc_p.tau_s2 * second,
@@ -562,7 +564,7 @@ fig.suptitle(
     f'ridge regression readout',
     fontsize=12, fontweight='bold', y=1.002)
 
-out_path = 'demo/ns_msn_rc_demo.png'
+out_path = 'demo/ns_msn_rc_demo_%s.png' % ('stdp' if USE_STDP else 'static')
 plt.savefig(out_path, dpi=150, bbox_inches='tight')
 print(f"\nFigure saved → {out_path}")
 
@@ -574,25 +576,25 @@ print(f"\nFigure saved → {out_path}")
 #  -----------------
 #  syn = make_synapse(...)          # creates Synapses with model='w : amp'
 #  syn.w = np.random.gamma(2, 1.5e-6, len(syn.w)) * amp   # override here
-#  Alternative distributions:
+# #  Alternative distributions:
 #    np.random.uniform(0, 10e-6, ...)           # flat
 #    np.random.lognormal(np.log(5e-6), 0.5, .) # log-normal
 #    syn.w['i < 10'] = 8e-6 * amp              # subset assignment
-#
-#  STDP PLASTICITY (§3b)
-#  ----------------------
-#  Use raw Synapses (NOT make_synapse) when you need state variables:
+
+# #  STDP PLASTICITY (§3b)
+# #  ----------------------
+# #  Use raw Synapses (NOT make_synapse) when you need state variables:
 #    model  = 'w : amp / dApre/dt = ... / dApost/dt = ...'
 #    on_pre  = 'Is1_exc_post += w; Apre += 1; w = clip(w - Apost*lr, ...)'
 #    on_post = 'Apost += 1; w = clip(w + Apre*lr, ...)'
 #  Weights self-update at every spike — no labels, no explicit training step.
-#
-#  LINEAR READOUT (§9)
-#  --------------------
+
+# #  LINEAR READOUT (§9)
+# #  --------------------
 #  Readout weights W_out are NOT in Brian2.  Train once offline:
 #    W_out = np.linalg.solve(X'X + λI, X'y)
 #  X : (n_trials, N) spike-count matrix from the reservoir
 #  y : (n_trials,)  labels {-1, +1}
 #  Predict: y_hat = sign(X_new @ W_out)
-#
+
 # %%
