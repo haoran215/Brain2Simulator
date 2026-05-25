@@ -3,7 +3,7 @@
   "_role": "Excitatory MSN neuron (E1, E2) in the 2E+1I motif demo",
   "_notes": "Intrinsic params only — tonic bias I_0 and any heterogeneity are set in code after construction. tau_s lives on the synapse configs.",
   "Cm":     1e-6,
-  "Ra":     47.0,
+  "Ra":     2200.0,
   "Rm_hi":  100000.0,
   "Rm_lo":  500.0,
   "Vth":    1.5,

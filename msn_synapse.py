@@ -63,13 +63,16 @@ class SynapseParams:
     weight:     float       = 10e-6     # A
     kind:       str         = 'exc'    # 'exc' | 'inh'
     tau_s1:     float       = 200e-3   # s
-    tau_s2:     float       = 200e-3   # s
+    tau_s2:     float       = 200e-3   # s  (unused when cascade='exp')
     delay:      float       = 0.0      # s
     target_var: str | None  = None
+    cascade:    str         = 'alpha'  # 'alpha' (2-stage Is1→Is2) | 'exp' (single exponential)
 
     def __post_init__(self):
         if self.kind not in ('exc', 'inh'):
             raise ValueError(f"kind must be 'exc' or 'inh', got {self.kind!r}")
+        if self.cascade not in ('alpha', 'exp'):
+            raise ValueError(f"cascade must be 'alpha' or 'exp', got {self.cascade!r}")
 
     # ── JSON I/O ──────────────────────────────────────────────────────────────
 
@@ -113,8 +116,18 @@ class SynapseParams:
 # ║ Equations (cascade lives on the synapse)                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-def _syn_eqs(target_var: str) -> str:
-    """Build the synapse model string.  target_var is the post inlet name."""
+def _syn_eqs(target_var: str, cascade: str) -> str:
+    """Build the synapse model string.
+
+    cascade='alpha' : 2-stage Is1→Is2 (alpha-function response when tau_s1=tau_s2)
+    cascade='exp'   : single exponential (sharp onset, exponential decay)
+    """
+    if cascade == 'exp':
+        return f"""
+        dIs1/dt = -Is1 / tau_s1              : amp (clock-driven)
+        {target_var}_post = Is1              : amp (summed)
+        w : amp
+    """
     return f"""
         dIs1/dt = -Is1 / tau_s1                  : amp (clock-driven)
         dIs2/dt = (-Is2 + Is1) / tau_s2          : amp (clock-driven)
@@ -168,15 +181,16 @@ def make_synapse(
     # (e.g. 'I_inh_mutual') if the target group declared one via make_msn.
     target_var = params.target_var or f"I_{params.kind}"
 
+    ns = {'tau_s1': params.tau_s1 * second}
+    if params.cascade == 'alpha':
+        ns['tau_s2'] = params.tau_s2 * second
+
     syn = Synapses(
         source, target,
-        model     = _syn_eqs(target_var),
+        model     = _syn_eqs(target_var, params.cascade),
         on_pre    = 'Is1 += w',
         method    = 'euler',
-        namespace = {
-            'tau_s1': params.tau_s1 * second,
-            'tau_s2': params.tau_s2 * second,
-        },
+        namespace = ns,
         name      = name,
     )
 
@@ -187,7 +201,8 @@ def make_synapse(
 
     syn.w = params.weight * amp
     syn.Is1 = 0 * amp
-    syn.Is2 = 0 * amp
+    if params.cascade == 'alpha':
+        syn.Is2 = 0 * amp
 
     if params.delay > 0:
         syn.delay = params.delay * second

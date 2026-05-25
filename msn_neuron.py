@@ -109,13 +109,18 @@ class MSNParams:
 
     # ── Derived quantities ────────────────────────────────────────────────────
 
+    @property
+    def I_gt(self) -> float:
+        """Approximate gate trigger current = rheobase [A]: Vth / (Rm_hi + Ra)."""
+        return self.Vth / (self.Rm_hi + self.Ra)
+
     def operating_window(self) -> tuple[float, float]:
         """(I_min, I_max) in amps — the spiking current window.
 
-        I_min  rheobase          = Vth / (Rm_hi + Ra)
+        I_min  rheobase          = Vth / (Rm_hi + Ra)  ≈ I_gt
         I_max  depol-block onset = I_hold
         """
-        return self.Vth / (self.Rm_hi + self.Ra), self.I_hold
+        return self.I_gt, self.I_hold
 
     def time_constants(self) -> tuple[float, float]:
         """(τ_open, τ_close) in seconds.
