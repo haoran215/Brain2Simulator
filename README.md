@@ -66,8 +66,10 @@ Switching is hysteretic and event-driven:
 |---|---|---|
 | Open → Closed | $V_m > V_{\text{th}}$ and `s = 0` | `s ← 1`; emit spike to downstream synapses |
 | Closed → Open | $I_M < I_{\text{hold}}$ and `s = 1` | `s ← 0` |
-Here put V_m < V_reset
-where **`I_M = V_m / R_a`** is the current through the load resistor `R_a` — i.e. the anode current of the thyristor. This is the physically observable holding-current quantity: the thyristor latches off when the current through its anode branch drops below $I_{\text{hold}}$, not when the total series current does.
+
+where **`I_M = V_m / (R_m(s) + R_a)`** is the series current through the memristor + load resistor — the thyristor's anode current. $I_{\text{hold}}$ is the standard thyristor **holding current**: the minimum anode current required to maintain conduction. When $I_M$ drops below $I_{\text{hold}}$, the thyristor turns off.
+
+**Why `I_hold` also equals `I_max`:** in the closed state ($R_m^{\text{lo}} \approx 0$), the steady-state current is $I_M^{ss} \approx I_{\text{in}}$. When $I_{\text{in}} > I_{\text{hold}}$, this steady state always exceeds $I_{\text{hold}}$, so the reopen event is never triggered and the neuron stays permanently latched (depolarisation block). Thus $I_{\text{max}} = I_{\text{hold}}$ is a consequence of the holding-current mechanism, not an independently set parameter.
 
 ### 3.1 Gate-current threshold
 
@@ -281,7 +283,7 @@ The code defaults in `msn_neuron.py` are calibrated against 35 P0118MA thyristor
 | Quantity | Formula | Value |
 |---|---|---:|
 | Rheobase | $I_{\min} = V_{\text{th}} / (R_m^{\text{hi}} + R_a)$ | ≈ 32 µA |
-| Depol-block onset | $I_{\max} = I_{\text{hold}}$ | 77 µA |
+| Depol-block onset (`I_max`) | $I_{\max} = I_{\text{hold}}$ (see §3) | 77 µA |
 | Hold voltage | $V_{\text{hold}} = I_{\text{hold}} \cdot (R_m^{\text{lo}} + R_a)$ | ≈ 0.17 V |
 | Open-state τ | $\tau_{\text{open}} = C_m (R_m^{\text{hi}} + R_a)$ | ≈ 6.2 ms |
 | Closed-state τ (spike width) | $\tau_{\text{close}} = C_m (R_m^{\text{lo}} + R_a)$ | ≈ 221 µs |

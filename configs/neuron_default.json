@@ -3,7 +3,7 @@
   "_units": "SI — F, Ohm, V, A, s",
   "_Rm_hi_note": "60 kOhm is the effective off-state membrane resistance (thyristor anode-cathode off-state impedance). NOT the 680 kOhm gate-to-anode resistor.",
   "_Vth_note": "2.0 V is the spike threshold on Vm. Approximately equal to Vout peak since Rm_lo~0. Dataset mean=1.73V, std=0.56V, range=[1.1, 2.8] V.",
-  "_I_hold_note": "77 uA is the median I_sat from 35 devices (range 56.8-109.5 uA).",
+  "_I_hold_note": "Thyristor holding current: minimum anode current to maintain conduction. Equals I_max (depol-block onset) because when I_in > I_hold the closed-state steady-state current never drops below I_hold. 77 uA is the median I_sat from 35 devices (range 56.8-109.5 uA).",
   "Cm": 1e-7,
   "Ra": 2200.0,
   "Rm_hi": 60000.0,

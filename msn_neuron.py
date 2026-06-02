@@ -68,7 +68,13 @@ class MSNParams:
              (thyristor ≈ short circuit → ~10 Ω)
     Vth      Spike threshold on Vm                          [V]
              Set to 2.0 V (≈ Vout peak amplitude, since Rm_lo≈0)
-    I_hold   Reopen current — I_M below this reopens thyristor [A]
+    I_hold   Thyristor holding current — minimum I_M required to keep  [A]
+             the thyristor in the closed (conducting) state.
+             When I_M drops below I_hold the thyristor reopens (s → 0).
+             Equals I_max (depol-block onset): if I_in > I_hold, the
+             closed-state steady-state current I_in·Ra/(Rm_lo+Ra) ≈ I_in
+             always exceeds I_hold, so the reopen event never fires and
+             the neuron stays latched.
              Calibrated to median I_sat from 35 devices.
 
     Synaptic filter time constants (tau_s1, tau_s2) belong to each
@@ -119,6 +125,12 @@ class MSNParams:
 
         I_min  rheobase          = Vth / (Rm_hi + Ra)  ≈ I_gt
         I_max  depol-block onset = I_hold
+
+        Why I_max = I_hold: in the closed state (Rm_lo ≈ 0) the
+        steady-state current I_M → I_in·Ra/(Rm_lo+Ra) ≈ I_in.
+        When I_in > I_hold this steady state exceeds the holding
+        current, so the reopen condition (I_M < I_hold) is never
+        satisfied and the neuron stays permanently latched.
         """
         return self.I_gt, self.I_hold
 
@@ -144,7 +156,7 @@ class MSNParams:
             f"  Rm_hi={self.Rm_hi/1e3:.0f} kΩ (eff. off-state)   "
             f"Rm_lo={self.Rm_lo:.0f} Ω (thyristor on)\n"
             f"  Vth={self.Vth:.3f} V   I_hold={self.I_hold*1e6:.0f} µA\n"
-            f"  → I_min={I_min*1e6:.1f} µA   I_hold={I_max*1e6:.0f} µA\n"
+            f"  → I_min={I_min*1e6:.1f} µA   I_max=I_hold={I_max*1e6:.0f} µA\n"
             f"  → τ_open={tau_o*1e3:.2f} ms   τ_close={tau_c*1e6:.0f} µs   "
             f"t_spike≈{t_spike*1e3:.2f} ms"
         )

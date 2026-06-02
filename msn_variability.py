@@ -44,8 +44,11 @@ from brian2 import NeuronGroup, volt, amp
 
 # ── Measured population statistics (35 P0118MA devices, Dec 2025) ─────────────
 #
-#   Vth   ← amp_mean_bins column (Vout peak ≈ Vth when Rm_lo≈0)
-#   I_hold ← I_sat column (depolarisation-block current ≈ holding current)
+#   Vth    ← amp_mean_bins column (Vout peak ≈ Vth when Rm_lo≈0)
+#   I_hold ← I_sat column.  I_sat is the measured depolarisation-block onset
+#             current, which equals the thyristor holding current: when I_in
+#             rises to I_sat the closed-state steady-state current I_M ≈ I_in
+#             never drops back below I_hold, so the neuron stays latched.
 
 DEVICE_STATS: dict[str, dict] = {
     'Vth': {
