@@ -7,31 +7,17 @@ Synapse half of the split library.  Neuron counterpart: msn_neuron.py.
 
     from msn_synapse import SynapseParams, make_synapse
 
-Architecture change (cascade-on-synapse)
-─────────────────────────────────────────
-Each Synapses object now owns its own filter cascade:
+Each Synapses object owns its own filter cascade:
 
-    Is1 → Is2   (two-stage exponential)
-    on_pre:    Is1 += w
-    summed:    <target_var>_post = Is2
+    Is1 → Is2 (two-stage exponential), with per-type tau_s1, tau_s2.
+    on_pre:  Is1 += w
+    summed:  <target_var>_post = Is2
 
 Biologically this matches the receptor view: AMPA, NMDA, GABA-A, GABA-B
 each have their own kinetics; the postsynaptic neuron just sees the
 summed current.  Different receptor types onto the same neuron are
-modelled as separate Synapses objects, each writing to a distinct named
-inlet on the target (see msn_neuron.make_msn(exc_inlets=, inh_inlets=)).
-
-Migration note
-──────────────
-- tau_s1, tau_s2 now live in SynapseParams (used to be on MSNParams).
-- The neuron's Is1_exc / Is2_exc / Is1_inh / Is2_inh state variables
-  no longer exist.  Synapses write to summed inlets I_exc / I_inh
-  (or user-named inlets) instead.  Replace recordings like
-  `StateMonitor(G, 'Is2_exc')` with either `StateMonitor(G, 'I_exc')`
-  (the total) or `StateMonitor(syn_obj, 'Is2')` (per-edge).
-- Raw `on_pre='Is1_exc_post += w'` strings in custom Synapses break.
-  Either use make_synapse() (which sets up the cascade for you) or write
-  the cascade inline in your custom Synapses model (see _syn_eqs below).
+modelled as separate Synapses objects with different SynapseParams,
+each writing to a distinct named inlet on the target.
 
 Brian2 limitation
 ─────────────────
@@ -40,6 +26,8 @@ pair via 'summed' (later writes overwrite earlier ones).  When multiple
 pathways of the same kind converge on one target group, declare extra
 named inlets via make_msn(..., exc_inlets=..., inh_inlets=...) and set
 SynapseParams.target_var on each Synapses to a distinct inlet.
+
+See METHODOLOGY.md §3.1 and §4.4 for cascade dynamics and settling times.
 """
 
 from __future__ import annotations
@@ -58,13 +46,13 @@ from brian2 import Synapses, amp, second
 class SynapseParams:
     """Intrinsic parameters of one synapse / receptor type.
 
-    weight     Iw added to Is1 per pre-synaptic spike            [A]
+    weight     Iw added to Is1 per pre-synaptic spike          [A]
                Future hardware: resistance of a non-volatile memristor.
     kind       'exc' → writes an exc inlet (depolarising);
                'inh' → writes an inh inlet (hyperpolarising).
-    tau_s1     First-stage filter time constant                  [s]
-    tau_s2     Second-stage filter time constant                 [s]
-    delay      Synaptic transmission delay                       [s]
+    tau_s1     First-stage filter time constant                [s]
+    tau_s2     Second-stage filter time constant               [s]
+    delay      Synaptic transmission delay                     [s]
     target_var Optional explicit inlet name on the post group
                (e.g. 'I_inh_mutual').  If None, defaults to
                'I_exc' or 'I_inh' based on kind.  Must match an
@@ -72,21 +60,24 @@ class SynapseParams:
                exc_inlets=..., inh_inlets=...).
     """
 
-    weight:     float       = 6e-6     # A
+    weight:     float       = 10e-6     # A
     kind:       str         = 'exc'    # 'exc' | 'inh'
     tau_s1:     float       = 200e-3   # s
-    tau_s2:     float       = 200e-3   # s
+    tau_s2:     float       = 200e-3   # s  (unused when cascade='exp')
     delay:      float       = 0.0      # s
     target_var: str | None  = None
+    cascade:    str         = 'alpha'  # 'alpha' (2-stage Is1→Is2) | 'exp' (single exponential)
 
     def __post_init__(self):
         if self.kind not in ('exc', 'inh'):
             raise ValueError(f"kind must be 'exc' or 'inh', got {self.kind!r}")
+        if self.cascade not in ('alpha', 'exp'):
+            raise ValueError(f"cascade must be 'alpha' or 'exp', got {self.cascade!r}")
 
     # ── JSON I/O ──────────────────────────────────────────────────────────────
 
     @classmethod
-    def from_json(cls, path: str, key: str | None = None) -> 'SynapseParams':
+    def from_json(cls, path: str, key: str | None = None) -> SynapseParams:
         """Load parameters from a JSON file.
 
         Parameters
@@ -125,20 +116,17 @@ class SynapseParams:
 # ║ Equations (cascade lives on the synapse)                                 ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-def _syn_eqs(target_var: str) -> str:
-    """Build the synapse model string.  target_var is the post inlet name.
+def _syn_eqs(target_var: str, cascade: str) -> str:
+    """Build the synapse model string.
 
-    Custom Synapses (e.g. with STDP traces) can copy this body and add
-    their own trace variables:
-
-        model = '''
-            dIs1/dt = -Is1 / tau_s1                : amp (clock-driven)
-            dIs2/dt = (-Is2 + Is1) / tau_s2        : amp (clock-driven)
-            I_exc_post = Is2                       : amp (summed)
-            w     : amp
-            dApre/dt  = -Apre  / tau_pre  : 1 (event-driven)
-            dApost/dt = -Apost / tau_post : 1 (event-driven)
-        '''
+    cascade='alpha' : 2-stage Is1→Is2 (alpha-function response when tau_s1=tau_s2)
+    cascade='exp'   : single exponential (sharp onset, exponential decay)
+    """
+    if cascade == 'exp':
+        return f"""
+        dIs1/dt = -Is1 / tau_s1              : amp (clock-driven)
+        {target_var}_post = Is1              : amp (summed)
+        w : amp
     """
     return f"""
         dIs1/dt = -Is1 / tau_s1                  : amp (clock-driven)
@@ -156,7 +144,7 @@ def make_synapse(
     source,
     target,
     params: SynapseParams | None = None,
-    connect: 'str | bool' = 'i == j',
+    connect: str | bool = 'i == j',
     name: str = 'syn',
 ) -> Synapses:
     """Connect source to target MSN group.
@@ -168,6 +156,17 @@ def make_synapse(
     params  : SynapseParams (excitatory defaults if None).  Carries kind,
               weight, tau_s1, tau_s2, delay, target_var.
     connect : Brian2 connection condition string, or True for all-to-all.
+
+              Common patterns
+              ───────────────
+              'i == j'           1-to-1 (also self-loops when src is tgt)
+              'i != j'           all-to-all, no self-loops
+              True               all-to-all including self-loops
+              'rand() < 0.1'     random sparse, 10% probability
+
+              NOTE: topology is a NETWORK property — not stored in
+              SynapseParams.  Pass it here, not in the config file.
+
     name    : Brian2 object name — must be unique per start_scope()
 
     Returns
@@ -182,15 +181,16 @@ def make_synapse(
     # (e.g. 'I_inh_mutual') if the target group declared one via make_msn.
     target_var = params.target_var or f"I_{params.kind}"
 
+    ns = {'tau_s1': params.tau_s1 * second}
+    if params.cascade == 'alpha':
+        ns['tau_s2'] = params.tau_s2 * second
+
     syn = Synapses(
         source, target,
-        model     = _syn_eqs(target_var),
+        model     = _syn_eqs(target_var, params.cascade),
         on_pre    = 'Is1 += w',
         method    = 'euler',
-        namespace = {
-            'tau_s1': params.tau_s1 * second,
-            'tau_s2': params.tau_s2 * second,
-        },
+        namespace = ns,
         name      = name,
     )
 
@@ -201,7 +201,8 @@ def make_synapse(
 
     syn.w = params.weight * amp
     syn.Is1 = 0 * amp
-    syn.Is2 = 0 * amp
+    if params.cascade == 'alpha':
+        syn.Is2 = 0 * amp
 
     if params.delay > 0:
         syn.delay = params.delay * second
