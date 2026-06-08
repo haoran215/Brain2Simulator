@@ -1,19 +1,23 @@
 {
-  "_units": "weight in A, delay in s",
+  "_units": "weight in A, tau in s, delay in s",
   "_usage": "SynapseParams.from_json('configs/synapse_default.json', key='exc')",
 
   "exc": {
-    "_note": "Excitatory — adds to Is1_exc of post-synaptic MSN",
+    "_note": "Excitatory — writes I_exc_post of target MSN via summed cascade",
     "weight": 6e-6,
     "kind":   "exc",
+    "tau_s1": 0.2,
+    "tau_s2": 0.2,
     "delay":  0.0
   },
 
   "inh": {
-    "_note": "Inhibitory — adds to Is1_inh of post-synaptic MSN",
+    "_note": "Inhibitory — writes I_inh_post of target MSN via summed cascade",
     "_wta_tuning": "10 µA: at ~7 Hz and tau_s=200ms gives steady-state 14 µA suppression",
     "weight": 1e-5,
     "kind":   "inh",
+    "tau_s1": 0.2,
+    "tau_s2": 0.2,
     "delay":  0.0
   }
 }
