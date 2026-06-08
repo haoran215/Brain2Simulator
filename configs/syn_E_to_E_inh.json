@@ -1,0 +1,10 @@
+{
+  "_units": "weight in A, tau in s, delay in s",
+  "_role": "Mutual INHIBITION between E1 and E2 (alternative coupling for --mode mutual_inh)",
+  "_design": "Same slow timescale as the mutual-E config so the two modes are directly comparable. Weight is the sweep knob.",
+  "weight": 2e-6,
+  "kind":   "inh",
+  "tau_s1": 0.500,
+  "tau_s2": 0.500,
+  "delay":  0.0
+}

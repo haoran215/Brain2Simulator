@@ -1,0 +1,10 @@
+{
+  "_units": "weight in A, tau in s, delay in s",
+  "_role": "Slow global inhibition from I onto E1, E2",
+  "_design": "tau_s ~ 100 ms — matched to syn_E_to_I so the E→I→E loop has a single 'slow' timescale separate from intrinsic self-E (~5 ms). A brief I spike lingers across roughly one E-ISI. Weight chosen so steady-state Is2 from a few-Hz I rate exceeds the E neurons' (I_0 - I_min) margin.",
+  "weight": 2e-5,
+  "kind":   "inh",
+  "tau_s1": 0.100,
+  "tau_s2": 0.100,
+  "delay":  0.0
+}
