@@ -284,14 +284,14 @@ for col, (name, sm) in enumerate([('N1', sm_n1_self_exc), ('N2', sm_n2_self_exc)
                                    ('N3', sm_n3_self_exc), ('N4', sm_n4_self_exc)]):
     ax = fig2.add_subplot(gs[1, col])
     is12(ax, sm, f'{name} self-exc', COLORS[name])
-    ax.set_title(f'{name} self-exc  (τ={TAU_SELF_EXC*1e3:.0f} ms, fast — sustains burst)')
+    ax.set_title(f'{name} self-exc  (τ={TAU_SELF_EXC*1e3:.0f} ms)')
 
 # ── Row 2: slow self-inhibition per neuron ────────────────────────────────────
 for col, (name, sm) in enumerate([('N1', sm_n1_self_inh), ('N2', sm_n2_self_inh),
                                    ('N3', sm_n3_self_inh), ('N4', sm_n4_self_inh)]):
     ax = fig2.add_subplot(gs[2, col])
     is12(ax, sm, f'{name} self-inh', COLORS[name])
-    ax.set_title(f'{name} self-inh  (τ={TAU_SELF_INH*1e3:.0f} ms, slow — kills burst)')
+    ax.set_title(f'{name} self-inh  (τ={TAU_SELF_INH*1e3:.0f} ms)')
 
 # ── Row 3: N4 net current ─────────────────────────────────────────────────────
 ax_net = fig2.add_subplot(gs[3, :])
