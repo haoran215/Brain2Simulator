@@ -1,0 +1,11 @@
+{
+  "_comment": "MSN params fit to the measured hardware neuron (IFcurve.xlsx + O4scope_4.bin).",
+  "_method": "Ra, Cm fixed to hardware. Rm_lo set from spike width (FWHM~0.3ms). Rm_hi, Vth, I_hold fit to the working-range F-I curve (41-92uA, RMSE 5.9 Hz). Depol-block corner (>93uA) excluded as device-specific.",
+  "_units": "SI (F, ohm, V, A)",
+  "Cm": 100e-9,
+  "Ra": 2200.0,
+  "Rm_hi": 56400.0,
+  "Rm_lo": 1159.0,
+  "Vth": 2.39,
+  "I_hold": 96.0e-6
+}

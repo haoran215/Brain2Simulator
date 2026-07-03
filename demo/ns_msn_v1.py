@@ -182,6 +182,8 @@ if n_sp > 0:
     ax.set_title(f'Single spike shape (zoom on first spike)',
                  fontweight='bold')
     ax.legend(fontsize=9, loc='upper right')
+    # ax.set_xlim(-1, 30); ax.set_ylim(-5, 100)
+
 else:
     ax.text(0.5, 0.5, 'no spikes — increase T_run or I_in',
             ha='center', va='center', transform=ax.transAxes)
