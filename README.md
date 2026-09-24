@@ -472,6 +472,15 @@ Key tuning constraint: $I_w^{\text{inh}} < I_{\min} / (f_1 \cdot \tau_{s1})$ so 
 
 20 MSN neurons as a liquid-state reservoir for left/right Poisson-pattern classification. Two input streams (left, right) and recurrent connections each write to distinct named inlets (`I_exc_rec`, `I_exc_L`, `I_exc_R`) to satisfy the one-summed-writer rule. Ridge regression on spike counts achieves reliable train/test separation. A `USE_STDP` flag switches the recurrent weights between frozen-random and STDP-plastic; the STDP branch uses the cascade-on-synapse model with Apre/Apost traces.
 
+### 8.5 Single-neuron self-excitation pacemaker ([`demo/ns_msn_pacemaker.py`](demo/ns_msn_pacemaker.py))
+
+One MSN with a single self-excitatory synapse, kick-started by a 200 ms pulse and then left with **no external drive**, tests whether self-excitation alone can pace. Two neurons are compared side by side (each self-loop uses `i == j`, so they are two independent single-neuron experiments in one group):
+
+- **N0 — pure self-excitation.** The excitatory alpha current seeded by the pulse integrates and re-crosses rheobase, and positive feedback drives `Vm` up to the depolarisation-block ceiling. There the holding-current latch (`I_M < I_hold`) *itself* terminates each burst — so self-excitation alone yields a persistent pacemaker (~14 bursts/s), with the **depol block as the intrinsic negative feedback**, not synaptic decay.
+- **N1 — self-excitation + slow self-inhibition.** Adding a faster-recovering inhibitory self-loop ($\tau_{\text{inh}} < \tau_{\text{exc}}$, so the gap can end and firing restart) supplies spike-frequency adaptation. This carves a much slower, clean limit cycle (~1.5 bursts/s, CV ≈ 0.1) *below* the depol-block ceiling.
+
+Key point: pure positive feedback is *bistable* — on its own it fades or latches. A periodic burst rhythm needs a negative feedback, supplied either intrinsically by the depol block (N0) or explicitly by slow inhibition (N1). The regime is narrow (fade ↔ wind-up ↔ latch), so the script prints a per-neuron verdict with burst statistics to guide retuning. Note on signs: the model is current-based, so excitation is already `+I_exc` in `dVm/dt` — the positive feedback is simply an excitatory synapse, not a sign-flipped leak.
+
 ---
 
 ## 9. File map and inheritance
@@ -509,6 +518,9 @@ Per-experiment configs (JSON, one file per neuron / synapse type)
 Network demonstrations (all runnable from the demo/ directory)
 ─────────────────────────────────────────────
   demo/ns_msn_v3_bump.py      1 neuron + self-excit. bump test
+  demo/ns_msn_pacemaker.py    1 neuron self-excitation pacemaker:
+                              pure exc (depol-block bursts) vs
+                              exc + slow inh (adaptation bursts)
   demo/ns_msn_v4_network.py   20-neuron ring with local recurrent exc
   demo/ns_msn_wta_demo.py     two-neuron mutual-inhibition WTA
   demo/ns_msn_rc_demo.py      reservoir-computing demo — left/right
