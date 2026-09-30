@@ -1,0 +1,11 @@
+{
+  "_units": "weight in A, tau in s, delay in s",
+  "_role": "Slow mutual excitation between E1 and E2 — THE sweep knob for the motif experiment",
+  "_design": "tau_s ~ 500 ms — much slower than self-E (~5 ms thyristor close) and slower than global inhibition (~150 ms). The hypothesis: when this mutual coupling is strong enough, mutual-E drive on E2 from E1's history exceeds E1's effective self-drive after global-I suppression, producing an alternating E1/E2 winner pattern rather than synchrony.",
+  "_sweep_hint": "Try weights 0 → 10 µA in 1 µA steps; for each weight, observe whether the phase difference between E1 and E2 spike trains drifts, locks (in-phase / anti-phase), or oscillates slowly.",
+  "weight": 2e-6,
+  "kind":   "exc",
+  "tau_s1": 0.500,
+  "tau_s2": 0.500,
+  "delay":  0.0
+}
