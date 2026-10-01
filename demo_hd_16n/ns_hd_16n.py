@@ -1,24 +1,25 @@
 """
-ns_hd_4n.py
-===========
-4-direction head-direction (HD) network built from MSN neurons
-(Fig3.1_4Nturn_color.png, right panel).
+ns_hd_16n.py
+============
+16-direction head-direction (HD) network built from MSN neurons.
+Same wiring and parameters as the 4-direction network of demo/ns_hd_4n.py,
+with the ring enlarged to 16 positions.
 
-Neurons (13)
+Neurons (49)
 ────────────
-  EB1..EB4            ellipsoid-body ring — holds the heading bump
+  EB1..EB16           ellipsoid-body ring — holds the heading bump
   GI                  global inhibitor
-  PB1..PB4_ccw        protocerebral-bridge relays, counter-clockwise shift
-  PB1..PB4_cw         protocerebral-bridge relays, clockwise shift
+  PB1..PB16_ccw       protocerebral-bridge relays, counter-clockwise shift
+  PB1..PB16_cw        protocerebral-bridge relays, clockwise shift
 
-Connectivity (28 synapses)
+Connectivity (112 synapses)
 ──────────────────────────
   EBk      ──exc──► EBk            self-excitation (the bump)
   EBk      ──exc──► GI             drive the global inhibitor
   GI       ──inh──► EBk            global inhibition (WTA)
   EBk      ──exc──► PBk_ccw        position copy
   EBk      ──exc──► PBk_cw         position copy
-  PBk_ccw  ──exc──► EB(k-1)        shifted return  (PB1_ccw → EB4)
+  PBk_ccw  ──exc──► EB(k-1)        shifted return  (PB1_ccw → EB16)
   PBk_cw   ──exc──► EB(k+1)        shifted return  (PB1_cw  → EB2)
 
 Every neuron carries a subthreshold tonic bias I_0.  PBk_ccw / PBk_cw copy the
@@ -33,7 +34,7 @@ one position.
 
 Run
 ───
-    uv run python demo/ns_hd_4n.py --stage connections | bump | wta | turn
+    uv run python demo_hd_16n/ns_hd_16n.py --stage connections | bump | wta | turn
 """
 
 import os, sys
@@ -52,7 +53,7 @@ from msn_synapse import SynapseParams, make_synapse
 prefs.codegen.target = 'numpy'
 defaultclock.dt = 10 * us
 
-N_DIR = 4                       # number of heading directions
+N_DIR = 16                      # number of heading directions
 
 # ── Hardware parameters ─────────────────────────────────────────────────────
 # Cm is raised from the 100 nF default to 133 nF (100 nF ∥ 33 nF on the PCB).
@@ -86,7 +87,7 @@ W_SHIFT, TAU_SHIFT = 1.4e-6, 100e-3    # PB → EB   shifted return (moves the b
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 def build_network():
-    """Build the 13-neuron HD network.
+    """Build the 49-neuron HD network.
 
     Returns (groups, pathways):
       groups   : dict name → NeuronGroup          ('EB', 'GI', 'PB_ccw', 'PB_cw')
@@ -201,14 +202,14 @@ def stage_connections():
           f"(exc: {int(np.sum(W > 0))}, inh: {int(np.sum(W < 0))})")
 
     # ── Connectivity matrix ────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 9))
+    fig, ax = plt.subplots(figsize=(27, 24))
     vmax = np.abs(W).max()
     im = ax.imshow(W, cmap='bwr', vmin=-vmax, vmax=vmax)
     for r in range(n_tot):
         for c in range(n_tot):
             if W[r, c] != 0:
                 ax.text(c, r, f'{abs(W[r, c]):.1f}', ha='center', va='center',
-                        fontsize=8)
+                        fontsize=6)
     ax.set_xticks(range(n_tot)); ax.set_xticklabels(names, rotation=90)
     ax.set_yticks(range(n_tot)); ax.set_yticklabels(names)
     ax.set_xlabel('post-synaptic (target)')
@@ -223,7 +224,7 @@ def stage_connections():
                  'red = excitatory, blue = inhibitory, number = weight (µA)',
                  fontweight='bold')
     fig.colorbar(im, ax=ax, shrink=0.8, label='signed weight (µA)')
-    out = os.path.join(os.path.dirname(__file__), 'ns_hd_4n_connections.png')
+    out = os.path.join(os.path.dirname(__file__), 'ns_hd_16n_connections.png')
     fig.savefig(out, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved → {out}")
 
@@ -311,7 +312,7 @@ def mean_rate(ts, t_a, t_b):
 # ║ Stage 2 — EB bump                                                        ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-EB_COLORS = ['#f2c200', '#5fbf00', '#1f6fff', '#e020e0']   # EB1..4 as in Fig3.1
+EB_COLORS = [matplotlib.colors.to_hex(c) for c in plt.cm.tab20(np.arange(N_DIR))]   # EB1..16
 GI_COLOR  = '#d62728'
 
 def stage_bump():
@@ -354,9 +355,9 @@ def stage_bump():
           f"(PB total {I0_PB*1e6 + i_pb:.2f} µA vs I_min {I_MIN*1e6:.1f})")
 
     # ── Plot ───────────────────────────────────────────────────────────────
-    fig, axes = plt.subplots(4, 1, figsize=(14, 13), sharex=True,
+    fig, axes = plt.subplots(4, 1, figsize=(14, 19), sharex=True,
                              gridspec_kw=dict(hspace=0.35,
-                                              height_ratios=[1, 2, 1.3, 1.6]))
+                                              height_ratios=[1, 5.5, 1.3, 1.6]))
     def shade(ax):
         ax.axvspan(t_p, t_end, alpha=0.13, color='tomato')
 
@@ -370,9 +371,9 @@ def stage_bump():
     ax.set_ylabel('I_0 (µA)')
     ax.set_title(f'Input — subthreshold I_0 on every EB, '
                  f'{I_p*1e6:.0f} µA pulse on EB{k_p+1}', fontweight='bold')
-    ax.legend(fontsize=8, loc='upper right', ncol=5)
+    ax.legend(fontsize=7, loc='upper right', ncol=9)
 
-    # (1) raster of all 13 neurons
+    # (1) raster of all 49 neurons
     ax = axes[1]
     row, labels = 0, []
     for g in GROUP_ORDER:
@@ -383,9 +384,9 @@ def stage_bump():
             labels.append(neuron_name(g, k))
             row += 1
     shade(ax)
-    ax.set_yticks(range(row)); ax.set_yticklabels(labels, fontsize=8)
+    ax.set_yticks(range(row)); ax.set_yticklabels(labels, fontsize=7)
     ax.set_ylim(row - 0.5, -0.5)
-    ax.set_title('Spike raster — all 13 neurons', fontweight='bold')
+    ax.set_title('Spike raster — all 49 neurons', fontweight='bold')
 
     # (2) Vm of the pulsed EB
     ax = axes[2]
@@ -414,7 +415,7 @@ def stage_bump():
                  'I_min after the pulse', fontweight='bold')
     ax.legend(fontsize=8, loc='upper right', ncol=3)
 
-    out = os.path.join(os.path.dirname(__file__), 'ns_hd_4n_bump.png')
+    out = os.path.join(os.path.dirname(__file__), 'ns_hd_16n_bump.png')
     fig.savefig(out, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved → {out}")
 
@@ -426,10 +427,13 @@ def stage_bump():
 # Fig2.1c protocol: 0.5 s pulse every 2.5 s.  The pulse is 30 µA rather than
 # the figure's 35 µA: with the PBs copying the EBs, the pulsed EB also receives
 # PB shift current, and at 35 µA the summed EB → GI drive pushes GI past I_hold.
-# The target sequence is an
-# Euler circuit of the complete directed graph on 4 nodes, so every ordered
-# pair (EBa → EBb) is switched exactly once (12 transitions).
-WTA_SEQ    = [1, 2, 3, 4, 1, 3, 2, 4, 3, 1, 4, 2, 1]       # 1-based EB labels
+# Testing every ordered pair (240 switches) would take 10 minutes of simulated
+# time, so a reduced sequence is used.  The triangular numbers k(k+1)/2 mod 16
+# visit all 16 EBs once, with jumps of 1, 2, …, 15 positions; the walk is then
+# retraced backwards.  Every EB wins, and every jump distance in both
+# directions is switched (30 switches).
+_fwd       = [k * (k + 1) // 2 % N_DIR + 1 for k in range(N_DIR)]
+WTA_SEQ    = _fwd + _fwd[-2::-1]                  # 1-based EB labels, 31 pulses
 WTA_T0     = 0.5        # s, first pulse
 WTA_PERIOD = 2.5        # s
 WTA_DUR    = 0.5        # s
@@ -481,7 +485,8 @@ def stage_wta():
     # ── Per-epoch measurements ─────────────────────────────────────────────
     # steady = last 1 s before the next pulse; peak = pulse window + 0.3 s
     print(f"\nWTA test: {WTA_I*1e6:.0f} µA × {WTA_DUR:.1f} s pulses every "
-          f"{WTA_PERIOD:.1f} s, sequence EB{' → EB'.join(map(str, WTA_SEQ))}")
+          f"{WTA_PERIOD:.1f} s, {n_p} pulses, sequence "
+          f"EB{' '.join(map(str, WTA_SEQ))}")
     print(f"\n{'#':>2} {'switch':9s} {'ok':3s} {'t_trans':>7s} | "
           f"{'f_win':>5s} {'f_GI':>5s} {'self':>5s} {'EB→GI':>5s} {'GI→EB':>5s} | "
           f"{'pk f':>5s} {'pk fGI':>6s} {'pk self':>7s} {'pk EB→GI':>8s} {'pk GI→EB':>8s} | "
@@ -575,9 +580,9 @@ def stage_wta():
         print(f"{key:26s} {tgt:7.0f} {m:7.1f} {(m - tgt)/tgt*100:+6.0f}%")
 
     # ── Figure 1: Fig2.1c-style overview ───────────────────────────────────
-    fig, axes = plt.subplots(7, 1, figsize=(16, 21), sharex=True,
+    fig, axes = plt.subplots(7, 1, figsize=(40, 30), sharex=True,
                              gridspec_kw=dict(hspace=0.30,
-                                              height_ratios=[1, 2, 1.6, 1.6, 1.4,
+                                              height_ratios=[1, 6.5, 1.6, 1.6, 1.4,
                                                              1.4, 1.4]))
     ax = axes[0]
     for k in range(N_DIR):
@@ -585,7 +590,7 @@ def stage_wta():
                 label=f'pulse to EB{k+1}')
     ax.set_ylabel('input (µA)')
     ax.set_title('Input pulses (on top of I_0)', fontweight='bold')
-    ax.legend(fontsize=8, loc='upper right', ncol=4)
+    ax.legend(fontsize=7, loc='upper right', ncol=16)
 
     ax = axes[1]
     row, labels = 0, []
@@ -596,9 +601,9 @@ def stage_wta():
             ax.vlines(ts, row - 0.4, row + 0.4, color=c, lw=0.3)
             labels.append(neuron_name(g, k))
             row += 1
-    ax.set_yticks(range(row)); ax.set_yticklabels(labels, fontsize=8)
+    ax.set_yticks(range(row)); ax.set_yticklabels(labels, fontsize=7)
     ax.set_ylim(row - 0.5, -0.5)
-    ax.set_title('Spike raster — all 13 neurons', fontweight='bold')
+    ax.set_title('Spike raster — all 49 neurons', fontweight='bold')
 
     for ax, cur, title in ((axes[2], i_self, 'EB self-excitatory current'),
                            (axes[3], i_ebgi, 'EB → GI excitatory current')):
@@ -606,13 +611,13 @@ def stage_wta():
             ax.plot(t, cur[k], color=EB_COLORS[k], lw=1.0, label=f'EB{k+1}')
         ax.set_ylabel('current (µA)')
         ax.set_title(title, fontweight='bold')
-        ax.legend(fontsize=8, loc='upper right', ncol=4)
+        ax.legend(fontsize=7, loc='upper right', ncol=16)
 
     ax = axes[4]
     ax.plot(t, i_inh, color='k', lw=1.0)
     ax.set_ylim(bottom=0)
     ax.set_ylabel('current (µA)'); ax.set_xlabel('time (s)')
-    ax.set_title('GI → EB inhibitory current (same on all 4 EBs)', fontweight='bold')
+    ax.set_title('GI → EB inhibitory current (same on all 16 EBs)', fontweight='bold')
     ax.set_xlabel('')
 
     ax = axes[5]
@@ -624,7 +629,7 @@ def stage_wta():
     ax.set_ylabel('current (µA)')
     ax.set_title('EB → PB copy current (same on PBk_ccw and PBk_cw)',
                  fontweight='bold')
-    ax.legend(fontsize=8, loc='upper right', ncol=5)
+    ax.legend(fontsize=7, loc='upper right', ncol=17)
 
     ax = axes[6]
     for k in range(N_DIR):
@@ -632,17 +637,17 @@ def stage_wta():
     ax.set_ylabel('current (µA)'); ax.set_xlabel('time (s)')
     ax.set_title('PB → EB shifted-return current (PB_ccw(k+1) + PB_cw(k−1) onto EBk)',
                  fontweight='bold')
-    ax.legend(fontsize=8, loc='upper right', ncol=4)
+    ax.legend(fontsize=7, loc='upper right', ncol=16)
 
     for ax in axes:
         for t0 in starts:
             ax.axvline(t0, color='gray', ls='--', lw=0.5, alpha=0.6)
-    out = os.path.join(os.path.dirname(__file__), 'ns_hd_4n_wta.png')
+    out = os.path.join(os.path.dirname(__file__), 'ns_hd_16n_wta.png')
     fig.savefig(out, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved → {out}")
 
     # ── Figure 2: Fig2.2b-style firing rates around every switch ───────────
-    fig, axes = plt.subplots(3, 4, figsize=(18, 10), sharex=True, sharey=True,
+    fig, axes = plt.subplots(5, 6, figsize=(27, 17), sharex=True, sharey=True,
                              gridspec_kw=dict(hspace=0.30, wspace=0.08))
     for n, ax in zip(range(1, n_p), axes.flat):
         t0 = starts[n]
@@ -665,9 +670,9 @@ def stage_wta():
         ax.set_xlabel('time from pulse onset (s)')
     for ax in axes[:, 0]:
         ax.set_ylabel('firing rate (Hz)')
-    fig.suptitle('Firing rates around each of the 12 EB → EB switches '
-                 '(grey = pulse, dashed = PB copy)', fontweight='bold', y=0.94)
-    out = os.path.join(os.path.dirname(__file__), 'ns_hd_4n_wta_rates.png')
+    fig.suptitle('Firing rates around each of the 30 EB → EB switches '
+                 '(grey = pulse, dashed = PB copy)', fontweight='bold', y=0.905)
+    out = os.path.join(os.path.dirname(__file__), 'ns_hd_16n_wta_rates.png')
     fig.savefig(out, dpi=150, bbox_inches='tight')
     print(f"Figure saved → {out}")
 
@@ -677,13 +682,13 @@ def stage_wta():
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 # One EB pulse seeds the bump on EB1.  After that every pulse is a velocity
-# input to a whole PB population: 4 × CW (EB1→2→3→4→1), then 4 × CCW back.
+# input to a whole PB population: 16 × CW (EB1→2→…→16→1), then 16 × CCW back.
 TURN_SEED   = (0.5, 0.5, 0, 30e-6)        # t0, dur, EB index, amplitude
 TURN_T0     = 3.5        # s, first velocity pulse — EB1 holds the bump for 3.5 s first
 TURN_PERIOD = 2.5        # s
 TURN_DUR    = 0.5        # s
 TURN_I      = 25e-6      # A — I0_PB + TURN_I stays below I_min without the copy
-TURN_SEQ    = ['cw'] * 4 + ['ccw'] * 4
+TURN_SEQ    = ['cw'] * N_DIR + ['ccw'] * N_DIR
 
 def stage_turn():
     n_p    = len(TURN_SEQ)
@@ -769,9 +774,9 @@ def stage_turn():
           f"{n_ok}/{n_p} velocity pulses.")
 
     # ── Figure ─────────────────────────────────────────────────────────────
-    fig, axes = plt.subplots(6, 1, figsize=(16, 19), sharex=True,
+    fig, axes = plt.subplots(6, 1, figsize=(36, 28), sharex=True,
                              gridspec_kw=dict(hspace=0.30,
-                                              height_ratios=[1, 2.2, 1.5, 1.5,
+                                              height_ratios=[1, 6.5, 1.5, 1.5,
                                                              1.5, 1.5]))
     ax = axes[0]
     ax.plot(t, e.I_0[TURN_SEED[2]] / uA - I0_EB*1e6, color=EB_COLORS[0], lw=1.2,
@@ -794,9 +799,9 @@ def stage_turn():
             ax.vlines(ts, row - 0.4, row + 0.4, color=c, lw=0.3)
             labels.append(neuron_name(g, k))
             row += 1
-    ax.set_yticks(range(row)); ax.set_yticklabels(labels, fontsize=8)
+    ax.set_yticks(range(row)); ax.set_yticklabels(labels, fontsize=7)
     ax.set_ylim(row - 0.5, -0.5)
-    ax.set_title('Spike raster — all 13 neurons', fontweight='bold')
+    ax.set_title('Spike raster — all 49 neurons', fontweight='bold')
 
     ax = axes[2]
     for k in range(N_DIR):
@@ -804,7 +809,7 @@ def stage_turn():
     ax.plot(t, r_gi, color=GI_COLOR, lw=1.0, alpha=0.7, label='GI')
     ax.set_ylabel('rate (Hz)')
     ax.set_title('EB and GI firing rates', fontweight='bold')
-    ax.legend(fontsize=8, loc='upper right', ncol=5)
+    ax.legend(fontsize=7, loc='upper right', ncol=17)
 
     for ax, g in ((axes[3], 'PB_cw'), (axes[4], 'PB_ccw')):
         for k in range(N_DIR):
@@ -813,7 +818,7 @@ def stage_turn():
         ax.set_ylabel('rate (Hz)')
         ax.set_title(f'{g} firing rates — copy of EB, boosted by the velocity pulse',
                      fontweight='bold')
-        ax.legend(fontsize=8, loc='upper right', ncol=4)
+        ax.legend(fontsize=7, loc='upper right', ncol=16)
 
     ax = axes[5]
     for k in range(N_DIR):
@@ -825,12 +830,12 @@ def stage_turn():
     ax.set_ylabel('current (µA)'); ax.set_xlabel('time (s)')
     ax.set_title('PB → EB shifted-return currents (solid = CW, dashed = CCW)',
                  fontweight='bold')
-    ax.legend(fontsize=7, loc='upper right', ncol=5)
+    ax.legend(fontsize=6, loc='upper right', ncol=11)
 
     for ax in axes:
         for t0, sd in zip(starts, TURN_SEQ):
             ax.axvspan(t0, t0 + TURN_DUR, color='gray', alpha=0.12, lw=0)
-    out = os.path.join(os.path.dirname(__file__), 'ns_hd_4n_turn.png')
+    out = os.path.join(os.path.dirname(__file__), 'ns_hd_16n_turn.png')
     fig.savefig(out, dpi=150, bbox_inches='tight')
     print(f"\nFigure saved → {out}")
 

@@ -1,0 +1,491 @@
+Neuromorphic
+Computing and
+Engineering
+      
+PAPER • OPEN ACCESS
+Bio-inspired minimal hardware implementation of
+spike-time dependent plasticity for intelligent
+spiking neural networks
+To cite this article: Adrien d’Hollande et al 2026 Neuromorph. Comput. Eng. 6 034015
+ 
+View the article online for updates and enhancements.
+You may also like
+A neuromorphic digital Ising solver with
+Tabu-inspired inhibitory dynamics for
+scalable graph optimization
+Juan Núñez and Rafaella Fiorelli
+-
+Edge-computing-based tactile
+neuromorphic sentry system for intelligent
+parking surveillance
+Shuxin Lin, Jianle Lin, Haojie Zhong et al.
+-
+Why temporal spike order reversal drops
+spiking network accuracy and how to
+partially mitigate it
+Nhan Trong Luu, Duong Trung Luu, Nam
+Ngoc Pham et al.
+-
+This content was downloaded from IP address 193.51.83.4 on 30/09/2026 at 17:02
+Neuromorph. Comput. Eng.6 (2026) 034015 https://doi.org/10.1088/2634-4386/ae943a
+OPEN ACCESS
+RECEIVED
+4 March 2026
+REVISED
+23 July 2026
+ACCEPTED FOR PUBLICATION
+3 August 2026
+PUBLISHED
+24 August 2026
+Original content from
+this work may be used
+under the terms of the
+Creative Commons
+Attribution 4.0 licence.
+Any further distribution
+of this work must
+maintain attribution to
+the author(s) and the title
+of the work, journal
+citation and DOI.
+PAPER
+Bio-inspired minimal hardware implementation of spike-time
+dependent plasticity for intelligent spiking neural networks
+Adrien d’Hollande1, Olivier Schneegans 2, Kang W ang1 and Marcelo Rozenberg3,4,∗
+1 Université Paris-Saclay, CNRS Laboratoire de Physique des Solides, 91405 Orsay, France
+2 Group of Electrical Engineering of Paris (GeePs), CentraleSupélec, CNRS, Paris-Saclay and Sorbonne Universities, 91192 Gif-sur-
+Yvette, France
+3 Université Paris Cité, CNRS, Integrative Neuroscience and Cognition Center, Paris 75006, France
+4 Department of Physics, University of California, San Diego, CA 92093, United States of America
+∗ Author to whom any correspondence should be addressed.
+E-mail: marcelo.rozenberg@cnrs.fr
+Keywords: neuromorphic hardware, spiking neural networks, spike-timing dependent plasticity
+Abstract
+W e introduce a hardware circuit model that implements spike-time dependent plasticity (STDP)
+to endow spiking neural networks with learning capabilities. Our circuit model is characterized as
+both minimal and bio-inspired, due to its simplicity and to a novel active dendrite compartment
+that mimics the synaptic potentiation mechanism. The active dendrite consists of an integrate-
+and-fire stage which produces a train of pulses whose number is inversely related to the timing
+between pre- and post-synaptic spikes. The dendrite pulses modulate in a reliable manner the
+synaptic efficacy (conductance) that we implemented with a digipot, considered as an idealized
+non-volatile memristor. W e demonstrate the behavior of the circuit by implementing a minimal
+spiking neuron model of associative learning by STDP , which is analog to the classic conditioning
+experiment of Pavlov’s dog.
+1.Introduction
+Understanding learning is one of the greatest open challenges in science and is key to endow intelli-
+gence to systems and devices. Contributions to this problem are multidisciplinary, originating in fields
+that range from neuroscience to computer science, psychology, and more. The mechanistic origin of
+learning, at the level of neuronal circuits, is based on the widely accepted dogma that it is rooted in the
+modification of synaptic efficacies due to experience. The evolution of the synaptic strengths between
+neurons tailors the architecture of neural networks and enables animals and humans to acquire new
+motor and cognitive functions. While this topic is a matter of intense research, a main paradigm for
+the modification of synaptic couplings is the experimentally observed spike-timing dependent plasticity
+(STDP) [ 1–3]. This mechanism is often viewed as Hebb’s famous statement ‘cells that fire together wire
+together’ [ 4].
+STDP can be considered as the natural mechanism for a pair of neurons to build-up correlations
+between their spiking activities. In the celebrated Pavlov’s dog experiment [ 5], an initially neutral stim-
+ulus, such as the ringing of a bell, is presented along an unconditioned one, such as food. After a few
+‘teaching’ sessions where the two stimuli are presented together, the dog learns that a bell is associated
+with food, and starts drooling at the sole ringing. Hence a correlation has formed between two previ-
+ously unrelated phenomena: the neural response to the sound of a bell and the neural stimulation of a
+saliva producing gland.
+That celebrated experiment is an example of supervised learning, as it requires the action of a
+‘teacher’ . Nevertheless, the STDP mechanism is also associated to a more challenging type of learning,
+called unsupervised. In this case, an animal, or a neural network, learns from its own experience, that is,
+by trial an error. In that case the neural correlations are built as consequence of a self-produced mech-
+anism such as pleasure or dislike. This should not be confused with an innate behavior, which may be
+© 2026 The Author(s). Published by IOP Publishing Ltd
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Figure1. T op: schematic of a pre and post synaptic neurons i and j. The coupling between them is characterized by the efficacy
+Wij. Bottom: schematics of typical STDP functional forms. Left: antisymmetric STDP promotes the build-up of causal correla-
+tions (∆τ > 0), and depresses the synaptic efficacy upon anti-causal spike events. Right: potentiation of correlations for firing in
+coincidence, regardless of causality. The time-scale τp is the synaptic plasticity time.
+due to a pre-wiring of the network. Typical examples of unsupervised behavior are classification tasks.
+For instance, discovering tasty fruits or clustering in the classroom, such as when children go about dis-
+tinguishing friends from foes in pre-school.
+The STDP mechanism can be mathematically formalized by defining the change in the synaptic effi-
+cacy ∆W as a function to the relative timing ∆τ between the spike emission events of the two neurons
+sharing that synapse. Concretely, let ∆τij denote the time difference tj − ti between spikes fired by the
+pre-synaptic neuron i and the post-synaptic neuron j, coupled by the synaptic efficacy Wij (see figure 1).
+The type of STDP is characterized by the function ∆Wij(∆τij). Typically, this function is peaked at
+small values of the argument, as it enhances correlations between the firing events of two neurons. If
+the change ∆W is positive, it is called potentiation, as the coupling is made stronger. In contrast, if it is
+negative, it is called depression, as the influence of one neuron on the other is decreased. For instance, if
+the pre-neuron fires shortly before the post-neuron and ∆W is large and positive, then the STDP mech-
+anism contributes to build-up a positive correlation between the firing of i and j, i.e. enhances a causal
+relation between them. Figure 1 shows two common instances of STDP , and this can be generalized in
+multiple ways [ 6].
+The biological underpinning of the STDP mechanism is still a matter of study [ 7]. For the potentia-
+tion of a synapse, one may argue that as a pre-synaptic action potential arrives to the synapse, it produce
+a temporary sensitization of the junction during a plasticity time-scale τp. Then, if a post-synaptic action
+potential occurs within the τp window, it may produce a spike signal that propagates upstream along
+the post-synaptic dendrite. This back propagating potential may eventually hit the still sensitized synap-
+tic junction and induce an increase in its efficacy. Motivated by such a process, in this work we shall
+propose a phenomenological bio-inspired model for STDP that we implement in a minimal hardware
+circuit. T o that end we shall adopt a recently introduced minimal hardware model of an excitable (i.e.
+spiking) system [ 8, 9].
+2.Model
+2.1.BasicSTDPcircuit
+W e shall first describe a rather schematic circuit implementation of STDP , which has some common fea-
+tures found in many related previous work [ 10–15]. This basic circuit will serve us as a reference to later
+introduce our novel bio-inspired hardware model. In a typical implementation of STDP , as shown in the
+circuit of figure 2, and the schematic diagram in panel a of figure 3, the arrival of a pre-synaptic spike
+Vpre creates a voltage trace Vp that decays within a characteristic plasticity time τp ≈ RpCp. This trace
+enables the transistor M2 during τp, so long Vp ⪆ 0.7V , the threshold for polarization of M2. If a post-
+synaptic spike Vpost arrives, it will generate a similar trace that enables the second transistor M1 during
+a τp. If the time difference ∆τ between these two arrivals is smaller than τp, then both M1 and M2 will
+be simultaneously enabled during a certain overlap time δt ∼ (τp − ∆τ ) > 0. During that time window
+δt, a current ∆Ipot ≈ (Vpost − 0.7V)/Rpot will flow out of the current mirror CM. Hence, an amount of
+2
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Figure2. (a) Schematic of a basic STDP circuit. The upper part implements the potentiation (causal) case and the lower part the
+depression (anti-causal) case. The (trans-) conductance GW represents the synaptic efficacy, which is controlled by the potential
+of the capacitor CW. (b) Measured changes of the trans-conductance ∆G for three different values of τp = 3, 6.2 and 10 ms.
+These were obtained for Cp = 10 nF and Rp = 300 kΩ (blue), 620 kΩ (greeen), 1 MΩ (yellow), respectively. Notice that ∆G
+remains approximately constant at low ∆τ and then abruptly goes to zero as ∆τ ≈ τp.
+Figure3. Timing to Pulse Number Conversion. Panela: arrival of pre- and post-spikes with timing difference ∆τ create respec-
+tive traces of timescale τp. The overlap (orange region) is δt ≈ τp − ∆τ . Panelb: there is a current ∆I injected to the active den-
+drite during the overlap time δt. This current drive the integrate-and-fire sub-circuit of the ADC producing a number of pulses n
+proportional to δt.
+charge δq ≈ ∆Ipotδt will be added to the weight capacitor CW, increasing the (trans-)conductance GW
+in a certain ∆G which corresponds to the ∆W of figure 4. The conductance GW represent the synaptic
+coupling and its increase provides a potentiation of its efficacy. Note that the amount ∆G is controlled
+by the magnitude of the resistors Rpot (and Rdep for depression), as shown in figure 2.
+A similar analysis can be done for the synaptic depression case that corresponds to the anti-causal
+arrival of spikes. This is, when the pre-synaptic spike arrives after the post-synaptic one. The sole circuit
+difference is the configuration of the current mirror that produces a negative ∆I. Therefore there is a
+discharge of CW and a decrease of the synaptic conductance GW by a certain −∆G, whose value can be
+controlled with Rdep.
+The circuit just described was implemented and measured, and the behavior for three different values
+of τp is shown in figure 2. W e observe that, consistent with the previous discussion, ∆G(∆τ ) shows a
+dependence on the time-scale τp. However, one may consider a shortcoming of this simple STDP imple-
+mentation that ∆G does not show a significant dependence on ∆τ , as it exhibits a step-like behavior.
+3
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Figure4. Schematic of the bio-inspired STDP implementation.
+This is unlike typical theoretical models of STDP which show a decaying behavior (cf figure 1). Another
+shortcoming, perhaps more important, is rather practical as it is difficult to maintain the charge of CW
+beyond the order of the second, due to its intrinsic leak. As we shall see below, these shortcomings will
+be significantly improved by our bio-inspired STDP model circuit.
+2.2.Bio-inspiredcircuitwithactivedendritecompartment(ADC)
+Our new implementation is schematically shown in figure 4. It introduces two main features with
+respect to the basic STDP model. Firstly, we replace the capacitor-plus-transistor that model the tun-
+able synaptic conductance. Such a combination is hard to control due to both, the threshold behavior of
+the transistor and the leak of CW. As we mentioned, the later is specially problematic, as it quickly erases
+the eventual learning (although it may find applications in short term memory). Our practical solution
+is to replace the capacitor plus transistor by a digital potentiometer (digipot). The digipot resistance (and
+conductance) can be easily changed, up- or downwards, between 0 to Rmax in a number N of equal dis-
+crete steps δr, such that Rmax = Nδr. It is interesting to mention that a digipot can also be considered
+an idealized non-volatile memristor, i.e. a resistive component whose value can be tuned by application
+of pulses [ 16]. Memristive materials and devices are under intense current research for energy-efficient
+artificial intelligence hardware [ 17–19]. Our digipot solution has the merits of wide availability, reliability
+and simple implementation. It therefore serves our present goal of introducing a novel STDP synaptic
+circuit model. Nevertheless, the digipot component may eventually be replaced by non-volatile mem-
+ristors, if low-energy and small footprint are required. The second and most important feature that we
+introduce in our model is an active dendrite compartment (ADC, not to be confused with analog-digital
+converter). This is a bio-inspired mechanism that allows to modify the synaptic weight depending on
+the timing difference ∆τ . The ADC is modeled as an excitable sub-circuit that sends an upstream spik-
+ing signal. T o implement these dendritic pulses W e adopt an integrate-and-fire circuit model based on
+a volatile memristor device made of a thyristor-plus-resistor, which was recently introduced [ 8, 9]. The
+ADC translates the delay ∆τ into a number of spikes that are used to modify the conductance value
+of the synaptic digipot. As we shall see, an important feature of our circuit model is that, consistent
+with theoretical STDP models and its experimental observation, the smaller the ∆τ , the stronger the
+‘upstream’ signal and the larger the conductance change of the synapse. This bio-mimetic feature is
+rarely implemented in hardware models. Our bio-inspired STDP circuit model is shown in figure 5.
+Similarly to the basic circuit that we described before, this circuit also has two RC pairs at the input
+to provide the two traces Vp
+pre(t) and Vp
+post(t) of the arriving spikes. As before, the traces start at the
+arrival time of the spikes, tpre and tpost, and both decay exponentially with the time-constant τp ≈ RpCp
+as shown in panel a of figure 3.
+The pre- and post- traces, as in the previous circuit, enable the gates of two respective transistors
+that are in series. When the traces overlap and they are simultaneously above 0.7V , the input side of the
+current mirror is enabled. In this case, there is a current ∆I ≈ V+/Radc that flows during the overlap
+time δt, as shown in panel b of figure 3. The current mirror reproduces the current ∆I at its output.
+Hence, the ADC compartment gets as input the same current ∆I during a time δt. The ADC is mod-
+eled as an excitable integrate-and-fire unit, similar as that introduced in [ 8]. Thus, the input ∆I to the
+ADC produces a train of equally spaced spikes during the period δt, whose frequency is controlled by
+the intensity of ∆I (i.e. integrate-and-fire model). Hence, the number n of spikes in the train is n ∝ δt.
+Those spikes are subsequently reshaped into 0–5 V pulses by the two transistors as shown in figure 5
+[8, 20], for proper input to the digipot. An example of this is displayed in figure 6: the first and second
+4
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Figure5. STDP circuit with active dendrite compartment (ADC). The input part of the circuits is the similar to the simpler
+model shown in figure 2. The coincidence current ∆I is now injected into ADC integrate-and-fire block. The ADC produces
+a train of spikes that modify the conductance GW of the digipot. The lower sub-circuit has the SR flip-flop that distinguishes
+between the causal or anti-causal arrival of pre and post spike inputs. It toggles the up/down pin of the 50 k Ω digipot (DS1804-
+050). The component parameter values are: Rpre = Rpost = 45 kΩ, Rp = 350 kΩ, Cp = 10 nF ,Radc = 65 kΩ, C = 5 nF ,R1 =
+350 kΩ, R2 = 5.5 kΩ, R3 = 5 kΩ, R4 = 5 kΩ, the transistors of the trace coincidence detector, the current mirror and pulse
+shaper are implemented with ALD1105 (NMOS and PMOS)).
+Figure6. Measured data on the STDP circuit of figure 5. The output pulses of the ADC block (red) and STDP resistance RW =
+1/GW (purple) as function of time for several values of delays ∆τ between the Vpost (blue) and Vpre (green) onsets: (a) +0.5 ms
+(b) +2 ms (c) +3.5 ms (d) −0.5 ms (e) −2 ms (f) −3.5 ms.
+row from the top show the pre- and post-synaptic incoming spikes (in green and blue, not to be con-
+fused with their respective traces), and the third row shows the resulting spike-pulse trains (in red) at
+the output of the ADC. Crucially, we observe that the number of pulses is inversely related to the time-
+difference ∆τ between the arrival of the pre- and post-synaptic spike, consistent with our previous dis-
+cussion. When ∆τ ⪆ τp there are no more output spikes, where τp is the plasticity timescale. Since, as
+noted before, δt ≈ τp − ∆τ the approximate behavior of the number of pulses in the train is
+n (∆τ ) = n0
+[
+1 − |∆τ |/
+(
+k τp
+)]
+(1)
+where n0 is a constant (that depends on ∆I and model parameters) and k is of order one.
+Lets now estimate the expected change in the STDP conductance ∆GW that this implementation
+should provide. The digipot is characterized by its constant resistive change step δr. Hence, for a digipot
+at an arbitrary initial resistance state RW, an incoming train of n pulses changes RW in a simple linear
+fashion, i.e. ∆RW = ∓nδr (provided the final resistance RW + ∆RW does not reach any of the digipot
+limits). The negative sign is for causal arrival, i.e. the pre-spike arrives before the post-spike, and the
+plus of the anti-causal. This behavior is shown in the measured data of RW (in purple) in figure 6, for
+both cases, causal and anti-causal.
+5
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Figure7. Change in STDP conductance ∆G as a function of delay ∆τ (obtained as in figure 6). Left: causal STDP . Right: non-
+causal STDP . Note that the dependence is well captured by the equation (5) and the behavior reflects the STDP timescale set by
+τp = RpCp = 3.5 ms (cf figure 5).
+W e now need to estimate the corresponding change ∆GW of the STDP conductance when it is in an
+initial state GW = 1/RW. W e have,
+∆GW = 1
+RW ∓ nδr − 1
+RW
+(2)
+≈ GW
+(
+1 ± n δr
+RW
+)
+− GW. (3)
+Hence,
+∆GW ≈ ±n δr
+R2
+W
+= ±n δrG 2
+W (4)
+therefore, the change in the STDP conductance is also approximately linear in n, so long the initial value
+of RW is not close to the low resistance end. In other words, it is much larger than the resistance step,
+i.e. the initial RW ≫ δr. This condition can always be fulfilled by adding a small fixed series resistor to
+RW, bigger than the resistive step.
+W e should also note, from equation ( 4), that the change ∆GW has a non-linear dependence in the
+initial value of GW = 1/RW. Specifically, given a number n of pulses in the train, the corresponding
+∆GW will be relatively larger, the larger the initial value of GW. Within a learning scheme this qualita-
+tively means that the initial learning stages (from low values of GW) are relatively ‘harder’ than the later
+ones.
+Using equation ( 1), we can finally estimate the change ∆GW(∆τ ). W e have,
+∆GW (∆τ ) ∝ ±n ∼ ±n0
+[
+1 − |∆τ |/
+(
+k τp
+)]
+(5)
+which is a linearly decreasing function of ∆τ , in good agreement with the measured data shown in
+figure 7, and qualitatively similar to the behavior depicted in figure 1.
+W e need to discuss one more feature of the model circuit of figure 5, namely the RS flip-flop that
+allows to keep the information of the order of arrival of the pre- and post-synaptic spikes. This sub-
+circuit is optional. If it is not included, the STDP model provides a realization of the, ‘non-causal’ , sec-
+ond type of function ∆W(∆τ ), as shown in figures 1 and 7. In this case, the arrival order, i.e. causal-
+ity, is not important, Thus, the ( ±) drops out from the expressions above and ∆G(∆τ ) > 0 always
+increases.
+On the other hand, if causality is deemed important, the sub-circuit allows to toggle the digipot
+between its up/down mode. W e implement this with a SR flip-flop that works as follows: assume the
+initial inputs and output are all 0 and first consider a causal sequence. A logic 1 ( Vpre = 5V) arrives
+at S (set), then the output Q changes to 1. A successive logic 1 arrives to R (reset), then the output Q
+changes to 0. Hence, the digipot receives a logic 0 and goes to the down mode, ready to decrease its
+resistance (cf fourth row of top panels in figure 6) when the spike train of the active dendrite arrives
+(cf third row panels in figure 6). The output Q = 0 is maintained so long the R and S do not receive
+spikes. In the anti-causal case, i.e. pre arrives after post, a 1 is received first at R and then at S. The out-
+put Q of the flip-flop goes to 1 and it remains, so long no further pulses arrive. This sets the digipot to
+the up mode. The increase of resistance for the anti-causal case can be observed in the fourth row of the
+bottom panels of figure 6. W e implemented the SR flip-flop using two NOR gates.
+One other feature that we should also mention about the circuit relates to an important bio-inspired
+feature, the ‘dopamine effect’ , which is key for reinforcement learning. Dopamine is a neurotransmit-
+ter that modulates the intensity of the synaptic changes. This is captured by our circuit in the follow-
+ing manner: The intensity of the current ∆I controls the frequency of the pulses generated by the ADC.
+6
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Hence, given a time-delay between the pre- and post- pulses, the magnitude of ∆I controls how many
+pulses will be produced, ie the size of the STDP synaptic conductance change. The key point is that the
+intensity of the current is controlled by the resistance Radc, as was described before. Therefore, the mag-
+nitude of the conductance 1/Radc can be qualitatively assimilated to the effect of dopamine concentra-
+tion, as it modulates the strength of the synaptic change. This feature may be exploited in implementa-
+tions of networks with reinforcement learning by replacing Radc by a tunable resistance (such as a second
+digipot or a non-volatile memristor).
+3.Measuredcircuitbehavior
+W e now illustrate the operation of the STDP with two different paradigmatic examples.
+3.1.Synapticstrengthmodulation
+In the first case we input two spike trains pre- and post- with a slightly different frequency. This pro-
+duces a beating effect, namely the pre-spike precedes the post-spike during some time (causal ∆τ > 0)
+and then the situation alternates and the post-spike precedes the pre-spike (anti-causal ∆τ < 0). Hence,
+the change in the synaptic resistance (or conductance) periodically increases and decreases. This can be
+seen in figure 8, which demonstrates the phenomenon and allows to appreciate the stability of the circuit
+behavior.
+3.2.Classicalconditioning
+W e now demonstrate a basic application of the STDP behavior in associative learning, as in the classic
+example of Pavlov’s dog [ 5]. In figure 9 we show the detailed circuit implementation, where we can see
+the spike (pulse) generators in red and green for the ‘meat’ and ‘bell’ for the unconditioned and con-
+ditioned stimuli, respectively. The first one has a large intrinsic synaptic efficacy that directly drives the
+‘dog’s salivation’ neuron response (blue) with a strong synaptic current (orange). In contrast, the dog’s
+response to the bell stimulus is controlled by the STDP conductance GW, which is weak before the learn-
+ing. Hence, the corresponding synaptic current (purple) is also small and cannot drive the salivation.
+Upon activation of the stimuli pulses, the STDP mechanism will associate the provoked dog’s behav-
+ior (blue) to the initially innocuous stimulus (green) that precedes it. The correlated spiking activity
+of salivation and bell creates an increase of the synaptic conductance GW, following the STDP mech-
+anism described above. When GW efficacy increases enough, the bell stimulus eventually become able
+to produce a salivation response. W e say that the dog has learned to associate the sound of the bell to
+the food, and now the bell sound drives the dog’s drooling. By the same mechanism, the anti-correlated
+stimulation of bell and salivation would lead to the ‘forgetting’ of the previously learned behavior. The
+measured data that demonstrate this phenomenon is shown in figure 10, where we observe three phases:
+in the first phase, only the innocuous stimulus (bell) is active, shown in green spikes, and fails to pro-
+duce a response (salivation) in blue. Then, in the ‘learning’ phase, both stimuli, innocuous and uncon-
+ditioned (meat) are active. The former produces the response (salivation), due to the intrinsic strong
+synaptic efficacy (orange arrow). The key feature for learning is that the response (salivation) is causally
+associated to the innocuous stimulation (bell), i.e. the green spikes shortly precede the blue ones. This
+causal correlation produces the increase of the synaptic efficacy (purple arrow) between the green and
+blue neurons. As a result, after the associative learning phase, we obtain the ‘conditioned’ behavior,
+where the ‘dog’ has learned to respond to the previously innocuous bell stimulus, i.e. the green-neuron
+spikes are now provoke themselves the response of the blue neuron.
+3.3.Energyrequirements
+The quantitative comparison of the energy consumption of our STDP circuit to other analog propos-
+als is unfortunately not possible due to the lack a consistent benchmarks and lack of reports. Our STDP
+circuit of figure 5 can be separated into three main sub-circuits: the input sub-circuit that keeps traces
+of the incoming spikes is comparable to the basic circuit of figure 2, which itself is similar to those of
+relevant previous works [ 10–15]. The energy requirement per STDP event of this sub-circuit can be esti-
+mated by the cost of producing the traces. They dissipate ∼ CpV2
+spike ∼ 10 nF (1 V) 2 ∼ 10 nJ, where we
+assumed a typical order of magnitude value for the spike amplitude Vspike. As expected, from the circuit
+similarity this estimate is consistent with those that can be obtained from the previous works [ 10–15].
+The second sub-circuit is the one denoted as ADC in figure 5. This is comparable to the memristive
+integrate-and-fire neuron circuit [ 8], whose energy requirement per STDP event can be estimated as
+the cost of producing the train of pulses. Thus, we have ∼ CV2
+pnp ∼ 5 nF (5 V) 2 10 ∼ 1250 nJ, where
+7
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Figure8. Periodic modulation of the synaptic conductance (Causal STDP). T wo top panels: spiking behavior of neuron green
+and neuron blue. They are excited with currents of similar value that produces a small difference in their frequency. This leads
+to ‘beating’ where spikes of blue and green periodically advance and lags each other. hen the delay is short, there are many pulses
+generated by the active dendrite compartment (ADC). This produces the periodic increase and decrease of the resistance RW
+(digipot), hence, the changes in the synaptic conductance GW.
+Figure9. Pavlov Dog Circuit. The STDP block represents the sub-circuit of figure 5 with the conductance GW (digipot) explicitly
+shown. The component parameter values are: Rmeat = 25 kΩ, Rbell = 20 kΩ, Rm = 10 kΩ, Ra = 5 kΩ, Cm = 20 nF ,R1 = 100 kΩ,
+R2 = 1 kΩ, the transistors of the current mirrors and pulse shaper are ZNVL110A (NMOS) and ZVP331A (PMOS).
+Figure10. Classic conditioning (associative learning) implemented with the synaptic circuit of figures 5 and 9. Panel (a) shows
+spiking traces. The neuron-synapse configuration is shown in panel (b). Initially, neuron green (IN2) that represents the ‘bell’
+is excited but not able to drive a ‘dog’s salivation’ response in the output neuron blue (OUT), i.e. they do not have an effective
+synaptic coupling. At t = 50 ms an unconditioned stimulus neuron red (IN1) that represents ‘meat’ is activated and drives the
+output due to their intrinsic strong synaptic connection (orange arrow). The spikes of the green neuron become causally paired
+to those of the blue neuron (i.e green spikes briefly precedes the blue ones). This causal correlation provokes the increase of the
+synaptic efficacy between neuron green (pre) and neuron blue (post), which by the STDP mechanism increase their synaptic
+coupling (purple arrow). After t = 250 ms of training we observe that the neuron green (bell) is now able to provoke the response
+of neuron blue (dog’s salivation).
+Vp denotes the amplitude of the pulses and we assumed the number of pulses in the train np = 10. For
+concreteness we have adopted the values of the parameters in figures 5 and 6 above. This choice, done
+mostly for the sake of illustration, is likely to be overestimating the energy requirement by an order of
+magnitude. In fact, the value of Vp could be easily reduced to 3 V and np = 10 is more an upper bound
+8
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+than a typical expected value. Nevertheless, our estimate for the second sub-circuit is significantly larger
+than that of the first one. This indicates that the ADC sub-circuit is likely to dominate the energy cost
+in an actual implementation. The third sub-circuit corresponds to the digipot. Its energy cost in a typi-
+cal STDP update can be estimated from its datasheet and the duration of the update from figure 6. W e
+estimate for the energy, ∼ 50 µA 5 V 5 ms ∼ 1250 nJ, which is of a similar order of magnitude as that of
+the previous sub-circuit.
+The apparent high energy cost of the active dendrite sub-circuit can be justified by the improvement
+that it provides in the shape of the STDP function ∆GW(∆τ ). In fact, comparing the results from the
+basic STDP circuit in figure 2(b) to those of figure 7, we observe that the latter captures much better
+the decay of ∆GW with ∆τ and in the biological case [ 2]. The digipot sub-circuit also has a relative
+high energy cost. In this case, this can be justified on the merit of simplicity. Hence, this solution may
+be useful for the implementation of plastic spiking neural networks with a relatively small number of
+neurons, with that number depending on the specific context of the application (e.g brain-machine-
+interface, control systems, etc). A digipot based solution may not be appropriate for large scale networks
+due to both the energy cost and the large footprint. In fact, this is one of the reasons for the current
+ongoing interest in the research of non-volatile memristors [ 16–19].
+4.Conclusion
+W e have introduced a bio-inspired neuromorphic circuit that implements STDP . Similarly to most previ-
+ous implementations our hardware model has input stages where the arrival of the pre- and post- spikes
+are detected and respective temporal traces are created. However, a novel distinctive feature of our hard-
+ware model is that the detected delay is transformed into a sequence of pulses by and IF stage, which
+we call the ADC. This ADC is bio-inspired as it encodes the delay in a train of pulses, which is sent
+‘upstream’ to modify the synapse. The number of pulses is inversely related to the delay, realizing the
+timing-dependent modulation of the synaptic change, which is a characteristic of STDP that is rarely
+captured by hardware models.
+Another original feature of our work is that we implement the synaptic with a digipot, which avoids
+shortcomings of conventional models using a capacitor and a subthreshold transistor. Moreover, Our
+digipot solution has the merits of wide availability, reliability and simple implementation. It therefore
+served well our present goal of introducing a novel STDP synaptic circuit model. Nevertheless, as men-
+tioned before, if low-energy consumption and small device footprint is a concern, the digipot compo-
+nent may eventual be replaced by non-volatile memristors. One further merit of our circuit model is
+that such a replacement should be rather straightforward, once the rapidly evolving memristive technol-
+ogy becomes mature.
+Our hardware model is based on conventional widely available and affordable components, which is
+practical for networks of up to few hundreds of synapses. This scale may not be sufficient for complex
+artificial intelligence applications. Nevertheless, since it is based on analog hardware, it is well adapted
+for applications such as brain-machine-interfaces where the ‘machine’ needs to run in real time and to
+incorporate learning plasticity.
+While the network scale of our present implementation is relatively modest, there are no a priori
+impediments to port the circuit to VLSI CMOS. In fact, all our circuit components are rather standard
+for VLSI CMOS, including the current mirrors, teh SR flip-flop (implemented with two NOR gates) and
+the digipot. The thyristor of the integrate-and-fire sub-circuit of the ADC has already been ported to
+VLSI CMOS in [ 21].
+The main appeals of our STDP circuit is its simplicity and bio-inspiration, as it nicely captures the
+inverse relation between timing and synaptic change. Moreover, unlike VLSI implementations, our ana-
+log electronics approach does not suffer from long design delays nor requires complex fabrication pro-
+cedures. It is fully modifiable and all its timescales can be easily tuned, as shown in the present work.
+Therefore, it may open a new way to a reliable and practical implementation of learning in intelligent
+spiking neural networks.
+Acknowledgments
+This project has received financial support from the CNRS through the MITI interdisciplinary programs
+and from the French ANR ‘MemAI’ project ANR-23-CE30-0040.
+9
+Neuromorph. Comput. Eng.6 (2026) 034015 A d’Hollande et al
+Dataavailabilitystatement
+The data that support the findings of this study are openly available at the following URL/DOI: https://
+github.com/Integrative-Neuroscience/ActiveDendrite-STDP [22].
+Authorcontributions
+Marcelo Rozenberg  0000-0001-9161-0370
+Conceptualization (lead), Formal analysis (lead), Funding acquisition (lead), Investigation (lead),
+Methodology (equal), Project administration (lead), Supervision (lead), Writing – original draft (lead),
+Writing – review & editing (lead)
+References
+[1] Markram H, Lübke J, Frotscher M and Sakmann B 1997 Regulation of synaptic efficacy by coincidence of postsynaptic APs and
+EPSPs Science275 213
+[2] Bi G-Q and Poo M-m 1998 Synaptic modifications in cultured hippocampal neurons: dependence on spike timing, synaptic
+strength and postsynaptic cell type J. Neurosci.18 10464
+[3] Dan Y and Poo M-M 2004 Spike timing-dependent plasticity of neural circuits Neuron44 23
+[4] Donald H 1949 The organization of behavior New Y ork 1952 Donald the organization of behaviour 1952
+[5] Pavlov P I 2010 Conditioned reflexes: an investigation of the physiological activity of the cerebral cortex Ann. Neurosci.17 136
+[6] Buchanan K and Mellor J 2010 The activity requirements for spike timing-dependent plasticity in the hippocampus Front.
+Synaptic Neurosci.2 1361
+[7] Markram H, Gerstner W and Sjöström P J 2012 Spike-timing-dependent plasticity: a comprehensive overview Front. Synaptic
+Neurosci.4 2
+[8] Wu J, Wang K, Schneegans O, Stoliar P and Rozenberg M 2023 Bursting dynamics in a spiking neuron with a memristive voltage-
+gated channel Neuromorph. Comput. Eng.3 044008
+[9] Wu J, d’Hollande A, Du H and Rozenberg M 2025 Dynamics of neural motifs realized with a minimal memristive neurosynaptic
+unit Phys. Rev. Appl.23 034030
+[10] Indiveri G, Chicca E and Douglas R 2006 A vlsi array of low-power spiking neurons and bistable synapses with spike-timing
+dependent plasticity IEEE Trans. Neural Netw.17 211
+[11] T anaka H, Morie T and Aihara K 2009 A cmos spiking neural network circuit with symmetric/asymmetric STDP function IEICE
+Trans. Fundam. Electron. Commun. Comput. Sci.92 1690
+[12] Cruz-Albrecht J M, Yung M W and Srinivasa N 2012 Energy-efficient neuron, synapse and STDP integrated circuits IEEE Trans.
+Biomed. Circuits Syst.6 246
+[13] Smith A W, McDaid L and Hall S 2014 A compact spike-timing-dependent-plasticity circuit for floating gate weight implementa-
+tion Neurocomputing124 210
+[14] Y ang Z, Han Z, Huang Y and Y e T T 202155 nm CMOS Analog Circuit Implementation of LIF and STDP Functions for Low-Power
+SNNs (IEEE) pp 1–6
+[15] Serrano-Gotarredona T, Masquelier T, Prodromakis T, Indiveri G and Linares-Barranco B 2013 STDP and STDP variations with
+memristors for spiking neuromorphic learning systems Front. Neurosci.7 2
+[16] del V alle J, Ramírez J G, Rozenberg M J and Schuller I K 2018 Challenges in materials and devices for resistive-switching-based
+neuromorphic computing J. Appl. Phys.124 211101
+[17] Lanza M et al 2019 Recommended methods to study resistive switching devices Adv. Electron. Mater.5 1800143
+[18] Zhu K et al 2023 Hybrid 2D–CMOS microchips for memristive applications Nature618 57
+[19] Pazos S, Zhu K, Villena M A, Alharbi O, Zheng W, Shen Y , Yuan Y , Ping Y and Lanza M 2025 Synaptic and neural behaviours in a
+standard silicon transistor Nature640 69
+[20] Rozenberg M, Schneegans O and Stoliar P 2019 An ultra-compact leaky-integrate-and-fire model for building spiking neural net-
+works Sci. Rep.9 11123
+[21] Stoliar P , Akita I, Schneegans O, Hioki M and Rozenberg M J 2022 A spiking neuron implemented in VLSI J. Phys. Commun.
+6 021001
+[22] d’Hollande A et al 2026 ActiveDendrite-STDP Github (available at: https://github.com/Integrative-Neuroscience/ActiveDendrite-
+STDP)
+10

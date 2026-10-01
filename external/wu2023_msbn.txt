@@ -1,0 +1,570 @@
+Neuromorphic
+Computing and
+Engineering
+      
+PAPER • OPEN ACCESS
+Bursting dynamics in a spiking neuron with a
+memristive voltage-gated channel
+To cite this article: Jiaming Wu et al 2023 Neuromorph. Comput. Eng. 3 044008
+ 
+View the article online for updates and enhancements.
+You may also like
+Thermal block of action potentials is
+primarily due to voltage-dependent
+potassium currents: a modeling study
+Mohit Ganguly, Michael W Jenkins, E
+Duco Jansen et al.
+-
+Simulation of the physical process of
+neural electromagnetic signal generation
+based on a simple but functional bionic
+Na+ channel
+Fan Wang,  , Jingjing Xu et al.
+-
+Cancer as a disorder of patterning
+information: computational and biophysical
+perspectives on the cancer problem
+Douglas Moore, Sara I Walker and
+Michael Levin
+-
+This content was downloaded from IP address 89.3.229.32 on 30/09/2026 at 19:44
+Neuromorph. Comput. Eng. 3 (2023) 044008 https://doi.org/10.1088/2634-4386/ad139b
+OPEN ACCESS
+RECEIVED
+10 July 2023
+ACCEPTED FOR PUBLICATION
+8 December 2023
+PUBLISHED
+29 December 2023
+Original Content from
+this work may be used
+under the terms of the
+Creative Commons
+Attribution 4.0 licence.
+Any further distribution
+of this work must
+maintain attribution to
+the author(s) and the title
+of the work, journal
+citation and DOI.
+PAPER
+Bursting dynamics in a spiking neuron with a memristive
+voltage-gated channel
+Jiaming Wu1, Kang W ang1, Olivier Schneegans 2, Pablo Stoliar3 and Marcelo Rozenberg1,∗
+1 Université Paris-Saclay, CNRS Laboratoire de Physique des Solides, 91405 Orsay, France
+2 Laboratoire Génie électrique et électronique de Paris, CentraleSupélec, CNRS, Sorbonne Université and Université Paris-Saclay, 91192
+Gif-sur-Yvette, France
+3 National Institute of Advanced Industrial Science and T echnology (AIST), 305-8565 T sukuba, Japan
+∗ Author to whom any correspondence should be addressed.
+E-mail:marcelo.rozenberg@universite-paris-saclay.fr
+Keywords: memristor, spiking neuron, bursting
+Abstract
+W e introduce a voltage-gated conductance model for an artificial neuron that exhibits tonic, fast,
+and two types of intrinsic burst spiking. The spike generation is achieved with a single
+voltage-gated channel that exploits the conductance commutation properties of a two-terminal
+memristive device. Our circuit implementation is of unprecedented simplicity, using just four
+electronic components, all conventional, cheap and out-of-the-shelf. Our bursting neuron is a
+two-compartment model, similar to the Pinsky–Rinzel model. W e obtain the full phase diagram
+and discuss the origin of the different regions. W e find that the spike traces of the model bare
+striking similarity to experimental biological neuronal recordings. Our work may open a new way
+to investigate neural pathologies, such as epilepsy and Parkinson’s disease, from the study of the
+phase diagram and the transitions between spiking states of physical neuron models.
+1.Introduction
+The understanding of neural networks is one of the current great scientific challenges. The interest in this
+problem spans a wide range of fields. From applications in artificial intelligence, such as robotics and
+marketing, to neuroscience, such as elucidating the mechanism of cognitive functions in animal and human
+brains.
+The variety of methodological approaches to tackle the problem is equally vast and multidisciplinary. At
+the core of neural networks are neuron models [ 1, 2] whose great variety also reflect the diversity of the field.
+They range from abstract mathematical models, such as the two-state neurons in the Hopfield’s model [ 3], to
+sets of coupled differential equations in biologically realistic Hodgkin–Huxley models [ 4], to digital
+electronic implementations in neuromorphic chips [ 5, 6], or even to quantum materials with exotic
+metal–insulator transition behavior such as the Mott insulators [ 7–10].
+Here we shall focus on a novel spiking neuron model, which is at the crossroad of those approaches. An
+important point to make is that the present neuron model is defined by its hardware implementation . While a
+mathematical model is defined by a set of equations, here our model is defined by a circuit. Significantly, our
+circuit-model emulates the simplicity of the simplest mathematical models, such as the integrate-and-fire
+(IF) or Izhikevich’s [2, 11, 12]. It also shares the basic structure of all biological neuron models, where the cell
+membrane is represented by a capacitor whose charge is affected by the behavior of ionic conductance
+channels [2, 4, 12]. The nonlinear conductance in our neuron model is realized by a memristive device,
+[13–16] which allows to resolve the apparent contradiction of complex dynamical behavior with circuit
+simplicity. A memristor is a two-terminal resistive component whose value of resistance can change
+depending on the applied voltage and has hysteresis, i.e. a memory effect. A simple and practical definition of
+© 2023 The Author(s). Published by IOP Publishing Ltd
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+a memristor device was provided by Chua [ 14]: it is a device that exhibits a ‘pinched’ hysteresis loop ( see top
+left panel of figure 2).
+The relevance of memristive materials for neuromorphic engineering applications has been recently
+acknowledged and is developing fast [ 17–19]. There are various proposals for the implementation of spiking
+neurons based on memristive materials. Almost all of them adopt Mott insulators, which are quantum
+materials that exhibit insulator-to-metal transitions. For instance, the ‘neuristor’ [ 8] based on the the Mott
+compound NbO2, which is an approximate realization of the Hodgkin–Huxley neuron model. With a similar
+neuristor model, based on the Mott compound VO 2, it was demonstrated that it could capture as many as 23
+different biological spiking behaviors [ 9]. Another type of Mott materials, the GaT a4Se8 compound that
+showed a resistive collapse upon the application of a train of voltage spikes [ 20], was adopted to implement
+the basic leaky-IF (LIF) neuron model [ 7]. While Mott materials show a great promise to implement
+low-power neuromorphic hardware, they also face significant challenges [ 15, 16, 18]. Their complex
+fabrication methods require improvements to achieve a reproducible sample-to-sample behavior, long-term
+reliability and to function at room temperature. On the theory side, the description of the behavior of Mott
+insulators out-of-equilibrium is an open problem, and the physical mechanisms of the resistive collapse are
+being explored and debated [10, 21]. Those are the main reasons why the current research on spiking neuron
+models using Mott materials is still at the level of the single device characterization. The integration of Mott
+neurons into functional neural networks, beyond numerical simulations, remains an open challenge.
+In the present work, we exploit the simplicity of the memristor concept for a spiking neuron model, while
+avoiding the practical issues described above. W e adopt a new type of memristor device, which is obtained by
+the combination of two conventional electronic components, a resistor and a thyristor. A key insight is to
+realize that this memristive device has the same qualitative I–V characteristic as it is observed in the Mott
+quantum materials discussed above [8].
+A main result of the present work is to introduce a voltage-gated conductance model of unprecedented
+simplicity, which realizes four basic behaviors relevant to biological neurons: tonic, fast and two types of
+intrinsic burst spiking. In what follows, we first provide a pedagogical description of the implementation of
+an IF artificial neuron model with our memristive device. W e try to keep the discussion close to the concepts
+used in Neuroscience, so as to build a bridge between the different disciplines. Then, we build on that basic
+model, adding a second compartment that introduces a new timescale, to obtain complex burst-spiking
+behavior. Quite remarkably, we find that the voltage traces of our circuit model bare a striking resemblance
+to biological ones measured in rats, including their typical time scales. W e then further exploit the simplicity
+of our neuron model to obtain the full phase diagram, with four regions that correspond to four different
+spiking states. This phase diagram reveals the global behavior of the two-compartment model and leads to a
+speculative but also exciting observation. Namely, that the systematic changes experimentally induced in rats’
+bursting neurons, seem to follow paths on the phase diagram of our bursting neuron model.
+2.Thememristivespikingneuronmodel
+In basic IF spiking neuron models the integrate function is always assured by a capacitor Cm that represents
+the membrane of the neuron. Its charge is the integral of the input current Iin to the neuron, which results in
+the membrane potential V = Q/Cm =
+´
+Iindt/Cm. On the other hand, the fire function is an electric spike,
+due to the closing of a switch and the sudden discharge of the capacitor, when the potential attains a
+threshold value Vth (see figures 1(a)–(c)).
+In more realistic, conductance-based mathematical models [ 2, 12], the spike generation mechanism is
+achieved by voltage-gated channels (figure 1(c) shows a single channel for simplicity), which respond
+non-linearly to the applied voltage and control the charge and discharge of the Cm. Those models share a
+similar mathematical structure and are defined by a set of equations of the form,
+Cm
+dV
+dt = Iion (t) + Iin (t) = ΣkIk (t) + Iin (t) (1)
+Ik (t) = gk (V, Sk) V (2)
+where Ik are the channel currents and gk(V, Sk) are the respective voltage-gated conductances. The variable Sk
+indicates the ‘state’ of the conductance and it may also depend on time. T wo notable examples are the
+Hodgkin–Huxley model and its simplified version, the Morris–Lecar model [ 2, 12]. The conductance
+channels gk are defined by dynamical equations that characterize the dependence of the conductance with the
+voltage and other internal states of the channel. In order to generate an action potential spike, the multiple
+2
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure1. (a) Schematic of a biological neuron. (b) Basic integrate-and-fire model. (c) Schematic of nonlinear conductance
+channel model. (d) Integrate-and-fire model using a memristor; (e) MSN model circuit showing the two-terminal memristor
+obtained from the combination of a thyristor and a resistor. In the circuit we add a small load resistor Rload after the M device to
+measure the spike traces by the voltage Vout.
+channels need to successively open and close [ 2, 12]. For instance, in the basic form of the Hodgkin–Huxley
+model the gated channels are two, one for sodium and one for potassium. However, adopting a memristive
+channel we can reduce the number of channels to just one. The formal mathematical definition of the
+memristor is rather involved and beyond the scope of the present work. Here, we shall simply call a
+memristor a two terminal device, whose current value of resistance depends on its applied voltage and shows
+hysteresis. In the interest to remain closest to the concepts of neuroscience models, we shall consider here the
+conductance of the memristor, i.e. the inverse of its resistance.
+The memristive spiking neuron (MSN) model shown in figure 1(d) shares the same form as the models
+mentioned above. However, as will become clear later on, the spike generation in the MSN does not require
+of multiple voltage-gated channels but just a single one. Key to this feature is that the channel’s conductance
+is history-dependent or memristive. T o describe the spike generation in this model we focus on its simplest
+version, with a single memristive channel, that implements a (leaky) IF model. As shown in figure 1(d), the
+voltage-threshold switch of the IF model is implemented by the memristive conductance M. As will become
+clear below, depending on the applied voltage and its past history, this two-terminal device commutes from
+open (low conductance glow) to closed (high conductance ghigh) states and back. Initially, the memristor is in
+the open state allowing the membrane capacitor to increase its charge by integrating the applied input
+current. When its potential reaches a given Vth the memristor commutes to the closed state and the capacitor
+discharges emitting a spike of current. At the end of the discharge, when a low reset membrane voltage
+Vres < Vth is reached, the memristor commutes back to the open state and the charging of the membrane
+starts anew. Therefore, this memristive circuit realizes the basic tonic spiking mechanism of an IF model
+under a constant current injection.
+W e now show how these qualitative considerations can be practically implemented with a memristive
+conductance using conventional electronic components. W e simply connect a resistor (R) between the anode
+and gate electrodes of a thyristor ( T), to obtain the two-terminal M device, as shown in figure 1(e).
+The thyristor is a conventional electronic component, introduced in the 50s [ 22]. Its behavior can be
+most simply described as that of a diode with a threshold. A diode is a pn-junction that conducts current for
+3
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure2. Spiking behavior of the MSN-IF model of figure 1(e) for R = 100 kΩ and Cm = 10µF, which are kept fixed for the whole
+present work if not specifically indicated. (Main panel) The conductance commutation of the memristive voltage-gated channel
+g(V) during the cycle of spike generation. The x-axis corresponds to the voltage between the two terminals of M, and the y-axis to
+its two-terminal conductance. The commutation is correlated by the color dots with the spike trace (right panel). The I–V
+characteristic of the M device (top left panel) was obtained using the circuit shown in methods section figure 7(a). The color dots
+of the I–V indicate the work-points associated to the instants along the trace and along the orbit. The small black arrows in the
+I–V indicate the holding current Ihold (≈0.1 mA) and the threshold voltage Vth (≈0.9 mV). (Bottom left panel) The spiking
+frequency as a function of applied current f(Iin). The dotted line (blue) indicates the linear ideal IF behavior. The solid line (red)
+is a fit using the LIF-model type 1 excitability form f(Iin) ∝ −1/log(1 − Imin
+in /Iin) [2]. The neuron is excited in a finite range of
+input currents Imin
+in < Iin < Imax
+in , with Imin
+in = 32.3 µA and Imax
+in = 127.9 µA. Main and right panel data were measured at Iin =
+92.4 µA with small Rload = 47 Ω; top left panel data were measured with the M in series with a 1 k Ω resistor; bottom left panel
+data were measured with a small Rload = 47 Ω.
+one (direct) polarity and has negligible conductance for the opposite (inverse) one. A thyristor is a
+pnpn-device, so in direct has two pn junctions that conduct but has one np that is inverted, which creates a
+depletion region and does not conduct. However, by injecting electrons through the thyristor gate the
+depletion layer gets ‘flooded’ and the device suddenly starts to conduct between its anode and cathode.
+In our two-terminal memristor device this commutation is simply achieved by the R connected between
+the anode and gate of the T (figure 1(e)) by the following mechanism: when the T is non-conducting the
+depletion layer is in place. Then, a small current finds a smaller resistance path, flowing through the R and
+into the gate electrode. As the applied voltage increases, the small current increases and electrons entering the
+gate electrode start to populate (‘flooding’) the depletion layer. When the applied voltage (or the gate
+current) reaches a certain threshold, the depletion layer suddenly collapses and the two-terminal
+anode–cathode conductance commutes. Importantly, this high conductive state remains self-sustained by the
+relatively high current density flowing, until it falls beneath a small ‘holding’ current value Ihold (equivalent
+to the Vres see above), where the depletion region forms again. At that point the two-terminal memristor
+device commutes back to low conductance state.
+From this description, one can readily understand the hysteretic behavior of the ‘pinched’ I–V loop of
+the two-terminal M device, shown in the top left inset panel of figure 2. As the anode–cathode voltage V is
+increased, the gate current injected through R also increases. When this current becomes significant, the
+resistance of the T, hence of the M, suddenly collapses and the current I surges vertically (red-dot to
+yellow-dot). By decreasing the applied V the hysteresis becomes apparent, until the I decreases beneath the
+holding value and the high resistance state is recovered (blue-dot to green-dot). It is a key insight to realize
+that the I–V characteristics of the present memristive device are qualitatively identical to the Mott
+memristors, as, for instance, in the implementation of the ‘neuristor’ [ 8]. One word of warning is that one
+should not confuse the volatile memristive behavior of the present and of Mott devices, with the more
+commonplace and qualitatively different non-volatile type [15, 23, 24]. The latter is used to implement arrays
+of electronic synapses [25] and resistive random access memories [ 26].
+4
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+W e now turn to the description of the MSN-IF model of figure 1(e). Under the excitation of a constant
+current Iin the circuit emits a succession the electric spikes, such as the one shown in the top right panel of
+figure 2. During the spike generation, the voltage-gated conductance g(V) of the M device shows a close
+periodic orbit, which is shown in the main panel of figure 2. W e observe thatg(V) commutes between open
+and closed states (low/high conductance) that essentially correspond to the internal state variable S in
+equation 2. The commutations low-to-high and high-to-low are indicated by color dots, along the orbit and
+in the spike-trace (top-right inset), and are also correlated to the respective work-points on the I–V
+characteristics of the M device (left top-panel). The periodic orbit of g(V) illustrates the history-dependent
+behavior, which is a feature of the memristive conductance channel. The variation of g along the time-period
+plays an analogous role to the dynamical equations of the channels in the conventional conductance models.
+Upon excitation with a constant current Iin the membrane potential V of an ideal IF neuron increases as
+V(t) = [Iin/Cm]t, and suddenly discharges with a spike when V(t) = Vth. Hence, an IF neuron model emits
+spikes at a frequency f(Iin) = Iin/[CmVth], i.e. linear in the applied Iin. This behavior is qualitatively well
+reproduced by our neuron, as seen in the lower left panel of figure 2.
+However, there are evident departures from the simple linear behavior at both onsets of excitability, i.e. at
+the ends of the range Imin
+in < Iin < Imax
+in . W e recall thatexcitability refers to non-linear spiking response of the
+system to a constant input. In the present model there are two onsets of excitability, denoted Imin
+in and Imax
+in .
+Within this interval the system shows spiking behavior, otherwise the system is quiescent.
+The reason for the departure from the linear behavior at Imin
+in is because the conductance of the M device
+in the open state is not zero as in an ideal switch, which results a leakage current. Therefore, there is a finite
+input current that is needed to overcome that leak and excite the spiking. Hence, the neuron model of
+figure 1(e) may be better characterized as an LIF model. Indeed, we show in the lower left panel of figure 2
+that the f(Iin) is well captured by the expression derived from the LIF model, which demonstrates the type 1
+excitability of the MSN [12]. W e recall that type 1 excitability refers to a system that starts spiking from zero
+frequency [2, 12]. The origin of the excitability onset at Imax
+in is different. It follows from the fact that Iin is
+higher that Ihold, therefore once the thyristor commutes to the low conductance state, it does not switch back.
+Hence, instead of spiking behavior, there is a continuous high current across the M device. This high current
+quiescent state, with Iin > Imax
+in , is similar to the ‘depolarization’ state in biological neurons. On the other
+hand, the low current quiescent state, with Iin < Imin
+in is similar to the ‘hyper-polarization’ state [ 2].
+T o complete this introductory discussion it is useful to consider some orders of magnitude to realize that,
+conveniently, the MSN model produces spiking behavior on timescales compatible with biological neurons.
+Indeed, since the T has a Vth of the order of the volt and a holding current of the order of 100 µA, then
+adopting a Cm = 10 µF we may estimate a spiking frequency f ∼ [100 µA/(10 µF 1 V)] ∼ 10 Hz. Moreover,
+the duration of the spike is given by the discharge timescale that we may estimated as τspike ∼ Cm/ghigh ∼
+[10 µF/10 mS] ∼ 1 ms, similar as in biological neurons. T o choose the value of R we consider that the IF
+behavior requires the leak to be relatively small and also that the charging time-constant τm ∼ RCm must be
+larger than the inter-spike interval (ISI) ∼ 1/f ∼ 0.1 s. Thus, in our circuit we adopt R = 100 kΩ, so
+τm ∼ RCm = 1 s >> ISI. The present circuit is based on the LIF model previously introduced [ 27–29].
+However, the new MSN model achieves further conceptual and practical simplicity, providing a clear basis to
+build and understand the two-compartment bursting model that we introduce below.
+3.Thememristivespikingburstingneuronmodel
+W e now introduce a novel memristive spiking bursting neuron (MSBN) model of unprecedented simplicity.
+The model is obtained by equipping the basic MSN circuit figure 1(e) with a second time-constant τS = RSCS
+as shown in figure 3.
+In regard of the analogy made before with the conventional conductance models, the voltage of the
+second capacitor VS introduces an additional dynamical variable. This increases the dimensionality of the
+model, which is a necessary condition for the generation of intrinsic bursts [ 12]. More precisely, this second
+dynamical variable introduces an additional modulation of the conductance current Iion in equation (2).
+Thus, the model equations become,
+Cm
+dV
+dt = Iion (g, τS) + Iin (3)
+Iion = g (V, S) (V − VS) (4)
+5
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure3. (T op left) Schematic diagram of the Pinsky–Rinzel two-compartment model (bottom left) Schematic of the
+two-compartment MSBN circuit. (Right) Samples of the different spiking behaviors: tonic spiking (top), fast spiking (second
+top), intrinsic bursting 1 (bottom), and intrinsic bursting 2 (third from top). Parameter values ( Cm and R are the same as in
+figure 2 above): TS is obtained at ( Iin, Rs, Cs) = (72.2 µA, 47Ω, 0.1 µF); FS at (46.7 µA, 2.4 kΩ, 0.1 µF); IB2 at (75.1 µA, 2.4 kΩ,
+0.1 µF); IB1 at (38.7 µA, 3 kΩ, 0.1 µF).
+CS
+dVS
+dt = Iion − CS
+τS
+VS (5)
+where we observe that the last equation has the same form as the dynamical equation of [Ca]-current in
+standard theoretical bursting neuron models [ 12].
+However, there is a significant qualitative difference between those mathematical models and the MSBN
+one. The second time-constant that is introduced in the former models is usually a slow one. Its role is
+mainly to slowly modulate the tonic spike (TS) generation by driving the neuron in-and-out of its excitability
+range. In contrast, in the MSBN model the second time-constant τ S is smaller than the tonic spiking one τ m,
+i.e. τS << τm. In fact, τ S is of the same order of the discharge time τ spike, which is also a very small timescale.
+This feature has two main consequences: firstly, it leads to the emergence of a qualitatively different fast
+spiking (FS) mode, characterized by a high frequency ( ∼1/τS). Secondly, two new additional spiking modes
+emerge displaying bursting behavior (IB1 and IB2). Specifically, IB1 and IB2 appear to be associated to the
+onsets of excitability of the FS state, at low and high Iin, respectively.
+It is also worthwhile looking at the MSBN under a different light to appreciate its connection with a well
+known model of bursting neurons introduced by Pinsky and Rinzel (PR) [ 31]. It is a two-compartment
+model, where a dendrite and a soma compartment are coupled by a conductance gc, as we schematically
+show in figure 3. This model is a simplified version of an earlier one introduced by T raub et al which
+included 19 conductance channels [32]. These models are aimed at biological realism and can provide detail
+on the specific role of individual ionic channels in the spike generation. However, this is achieved at the
+expense of mathematical complexity, which also makes them impractical to use as a basis for building
+functional neural networks that are numerically tractable.
+Interestingly, the MSBN model can also be cast as two-compartment model, where one represents the
+dendrite and the other the soma (figure 3). In the MSBN the two compartments are directly connected,
+corresponding to the limit of strong electrotonic coupling (large gc) in the PR model [ 31] . Another
+similarity between the models, interesting in the light of our discussion above, is that the second
+compartment (the soma) is the one with a smaller time-constant. In contrast to the PR model, the
+formulation of the MSBN is of extreme simplicity, namely, it is a circuit counting just four electronic
+components (figure 3). Nevertheless, despite this simplicity the emerging dynamical behavior of the MSBN is
+complex. W e illustrate this point by showing the four distinct types of spiking traces in the right panel of
+figure 3. Quite remarkably, these variety of dynamical behaviors allows us to qualitatively reproduce the
+traces recorded in bursting biological neurons, as shown in figure 4. W e should also emphasize that the
+6
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure4. Measured spiking traces of our bursting electronic neuron. W e adopted the circuit parameters to qualitatively match the
+traces (including timescales) obtained in nigral dopamine bursting neuron by Ping and Shepard (see [ 30] figure 4). The left,
+middle and right columns of (a) denote TS, IB2, and TS with relatively long discharge time, respectively. The left, middle and
+right columns of (b) denote TS, FS, and IB1, respectively. Parameter values: TS in ( a) left is obtained at ( Cm, Iin, Rs, Cs) =
+(100 µF, 68.8 µA, 100 Ω, 0.1 µF); IB2 at (2000 µF, 76.2 µA, 2.3 kΩ, 0.1 µF); the wide TS (( a) right) at (100 µF, 70.1 µA, 0.9 kΩ,
+0.1 µF); TS in (b) is obtained at (100 µF, 93.8 µA, 100 Ω, 0.1 µF); FS at (1000 µF, 54.1 µA, 3 kΩ, 33 µF); and IB1 at (1000 µF,
+29.4 µA, 6.8 kΩ, 0.47 µF).
+comparison between the MSBN traces of figures 3 and 4 demonstrate how easily one can control spiking
+timescales in the MSBN. In fact, we increased them by two orders of magnitude (from ~10 ms to ~s) to
+match biological timescales, just increasing the value of the capacitor Cm.
+The simplicity of the MSBN circuit can be further exploited to obtain the full phase diagram and explore
+its global behavior, which provides further insights. In figure 5. we show the four regions of qualitatively
+distinct spiking behavior, obtained as a function of the input current Iin and the soma-compartment
+time-constant τ S. For convenience, we fix the capacitor value CS = 0.1 µF so we can scan through τ S by
+changing the resistance RS. W e may note that value ofCS is much smaller than the one of the
+dendrite-compartment (Cm = 10 µF). Thus, this choice would correspond to modeling a neuron with a
+relatively large dendritic tree (i.e. with a large effective area) [ 33]. Interestingly, all four regions of the phase
+diagram are relatively large, therefore none of the different spiking behaviors requires of fine tuning to be
+realized. In the right hand side panels of figure 5. we illustrate some specific instances of spiking traces within
+each of the four regions.
+W e may gain further insight from the phase diagram. For instance, we observe that at low τ S the MSBN
+shows a region of TS. This is expected, since in this limit both CS and RS are relatively small compared to the
+components of the dendrite compartment. Hence, their effect on the behavior of the system can be
+considered as a small perturbation with respect to that of the basic MSN, which only produces simple TS.
+Interestingly, as τ S is increased we observe that the TS boundary occurs at a fixed value
+τ ∗
+S ≈ (0.1 µF)(2 kΩ) = 0.2 ms. This independence of the Iin value indicates that the termination mechanism
+is unrelated to the TS frequency. Indeed, the instability of the TS state occurs because the timescale τ S
+becomes of the order of the duration of a single spike emission τspike ∼ 1 ms (see figure 2). Hence, when τ S
+and τ spike become comparable one can no longer consider the the effect of the former as a small perturbation
+to simple spiking, and multiple spiking modes emerge.
+W e describe now the transition from TS to FS states. For the sake of the argument, lets neglect the CS for
+the moment. Before the spike emission, the memristor is open, hence its resistance RM = 1/glow >> RS and
+the membrane potential V due to the accumulated charge on Cm mainly falls on M. When V reaches Vth, the
+resistance of the M collapses, and a spike is emitted. However, that sudden change in resistance also implies a
+sudden change in the voltage division ( RM,RS). Since now 1/ghigh << RS, only a negligible fraction of V falls
+on the M. Thus, the M should immediately commute back to the open state (see figure 2) and terminate the
+spike. However, the V is still at the threshold Vth, therefore this paradoxical and seemingly unstable situation
+indicates that when RS becomes sufficiently large, the system is no longer able to produce simple spike
+emission. This instability can be cured by the addition of the small CS, which brings in a finite time-constant
+and renders the FS state stable with a high frequency of order 1/τS = 1/(RSCS). Interestingly, this behavior is
+qualitatively similar to that of the PR model, where the soma potential is the fast variable that reacts to the
+excitation of the more slowly varying dendrite [ 12].
+7
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure5. Phase diagram of the bursting circuit obtained as a function of input current Iin versus the time-constant of the
+soma-compartment τS (at fixed Cs = 0.1 µF). TS: tonic spiking (red), FS: fast spiking (blue), IB1: intrinsic bursting 1 (green) and
+IB2: intrinsic bursting 2 (yellow). On the right side, traces recorded in the phase diagram qualitatively demonstrate the effects on
+neuronal behavior produced by changing the Iin or τs respectively. The corresponding positions of all traces in the phase diagram
+are marked with numbered white squares, and ( τs, Iin) are indicated in each numbered panel.
+W e may now qualitatively understand the origin of the intrinsic bursting states, IB1 and IB2. W e may
+note that they both emerge at the two boundaries of excitability, corresponding to the critical currents Imin
+in
+and Imax
+in . As we have seen before in the simpler MSN model case, those boundaries are characterized by the
+the onset of spiking behavior, which begins with long ISIs. Hence, we may think of each burst as an
+individual spike-emission event where the spike becomes a short and fast spike-train due to the instability
+phenomenon described above. The two different line-shapes of the IB1 and IB2 bursts, follow from the fact
+that they are respectively associated to two qualitatively different onsets of excitability, namely, the
+hyper-polarized and depolarized states that we discussed before.
+4.Navigatingthephasediagramandconnectiontoneuroscience
+As we emphasized many times already, the salient feature of the MSBN model is its simplicity. A prize to pay
+is that its parameters are not directly nor obviously connected to biological ones. However, the mapping of
+the full phase diagram opens an unexpected and exciting perspective. It unveils a global view of the
+systematic evolution of spiking states, which may provide a new type of guidance in the understanding and
+interpretation of experiments in neurobiology. More precisely, it may be interesting to search for
+phenomenological correlations between the systematic behavior of a biological neural system upon changing
+parameters, such as for instance applying neurotoxins or excitatory currents, and changing the parameters of
+the circuit-model.
+A first example to illustrate this is the above mentioned study of [ 30] in nigral dopamine neurons, which
+shows the systematic effects on a regular spiking trace of the successive application of neurotoxins (APA, TTX
+and TEA). In figure 6(a), we show how the two types of changes in the traces can be respectively located on
+the phase diagram. In one case, the trace starts from regular tonic spiking, evolves to the IB2-type bursting
+and then returns back to tonic spiking at a larger τ s state. In the second case, the trace starts from regular
+spiking, evolves to FS, and then into IB1-type bursting.
+An even more telling example is shown in figure 6(b), where the biological neuron traces (right bottom
+panel) are reproduced from the study of [ 34]. There, a pacemaker pre-BötC neuron is first silenced and then
+subject to a systematically increasing input current. The observation is that the neuron starts to emit bursts
+with a decreasing inter-burst time interval as the current is increased, until eventually it reaches an FS state.
+Remarkably, we can qualitatively reproduce the behavior with our model, by solely increasing the applied
+current (right top panel). This follows a simple vertical path along the phase diagram shown in the left panel.
+8
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure6. The evolutionary paths in phase diagram can reproduce to some extent the evolution of biological neuronal behavior.
+(a) The central panel shows the successive spiking states of the MSBN obtained by changing Iin and τ s. The numbers indicate the
+respective locations, forming a path on the phase diagram, indicated by arrows on the left panel. On the right panel we indicate
+the ‘neurotoxin path’ that drives the nigral dopamine neurons to evolve through those spiking states (see figure 4 and [ 30]). (b)
+Right panel (top) shows the systematic increase of IB1 bursting to FS by increasing Iin in the MSBN. (bottom) A qualitative similar
+behavior was observed in biological pre-Bötzinger respiratory neurons by increasing the input excitatory current [ 34]. As in panel
+(a), the numbers indicate the path along the phase diagram of the MSBN. The parameter pair ( Iin, Rs) for each of the shown
+traces are: for panel (a), red-1 trace (89.6 µA, 47 Ω), yellow-2 trace (89.6 µA, 2.6 kΩ), red-3 trace (82.8 µA, 1.3 kΩ), blue-2 trace
+(58.8 µA, 3.0 kΩ), and green-3 trace (36.5 µA, 3.0 kΩ); for panel (b), Rs is fixed at 2.5 kΩ, and Iin are increased from 26.0 µA, to
+36.4 µA, 40.8 µA, 46.5 µA, until 52.6 µA. Reproduced with permission from [ 34]. [© 1999 The American Physiological Society].
+As the current increased from 26.0 µA to 52.6 µA, the MSBN changed from a silence state to a bursting state
+and gradually decreased the inter-burst time interval, eventually changing to an FS state, just as the
+pacemaker pre-BötC neuron exhibited.
+As shown on the left panels, the evolutions of the traces follow paths in the phase diagram, crossing
+boundaries from one region to another. Hence, we may speculate that this type of observations may one day
+open the way to provide a rationale and perhaps suggest strategies to treat neural diseases associated to
+abnormal burst spiking.
+5.Conclusions
+In this work we have introduced a minimal model for an intrinsic bursting neuron, which is defined by its
+hardware implementation. The model is of unprecedented simplicity, counting just four components, two
+capacitors, one resistor and a memristor device.
+9
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+The MSBN circuit, nevertheless, sustains four types of complex spiking behavior, all of them at relevant
+biological time-scales and showing wave-forms of striking realism. W e have illustrated this feature by
+comparing spiking traces generated by the MSBN with traces measured in biological neurons.
+Implementing and understanding intrinsic bursting mechanisms in simple neuron models is also
+important from a broader perspective. In fact, bursting neurons are ubiquitous in animals and humans as
+they are associated to motor behavior. A burst signal is more reliable to command a muscle than a single
+spike [35, 36]. W ell studied examples are the pre-Bötzinger respiratory neurons [34] and the lobster’s
+stomatogastric ganglion [37]. Moreover, understanding the neuronal spike bursting phenomenon is also
+relevant in regard to neural dysfunctions, such as in Parkinson’s disease, epilepsy, depression and forms of
+autism [38–42].
+Several exciting perspectives are also open by our hardware model, which is easy to implement,
+understand and control; has all out-of-the-shelf components that are readily and cheaply available; and has
+low-power requirements if compared with CPU-based implementations. W e can make an order of
+magnitude estimate: the energy per spike can be very roughly (and likely over) estimated as CV 2, i.e.
+~(1 µF)(1 V)2 ∼ 1 µJ, or ~0.3 nWh. A conventional button cell battery can deliver a total energy of ~0.3 Wh,
+which is nine orders of magnitude larger. Hence, this would allow the MSN to spike 10 9 times, i.e. operating
+at 1 Hz it would last for about 30 years. Hence, it may be an excellent physical platform to develop
+neuroprostetics, such as neuronal implants for deep brain stimulation in the treatment of Parkinson’s
+disease [43], or low-cost smart pacemakers. Another exciting possibility would be to build brain–machine-
+interfaces, implementing functional neural networks interfaced via optogenetics in closed-loop systems with
+essentially zero-delay neuro-computation time.
+6.Methods
+The electrical characterization of the electronic neurons are performed on the prototypes implemented on
+breadboard with out-of-the-shelf components.
+The I–V curve of the M device (figure 2) is measured in a simple series circuit shown in figure 7(a),
+where a loading resistor Rload = 1 kΩ is in series with the M device. The voltage drops of the M device (V 0)
+and the Rload (V 1) are measured by an oscilloscope. Then the I–V curve are plotted from V1/Rload vs V 0. The
+other characteristics of the MSN (figure 2.) are measured in the circuit shown in figure 7(b). In order to
+finely tuning the input current Iin, a standard gate-controlled current mirror with two P-MOS transistors and
+one N-MOS transistor is applied. The input current of the neuron is measured by an ammeter A. The voltage
+drop V 0 of the M device and the output signals V 1 (voltage drop on a loading resistor Rload = 47 Ω) are
+measured by an oscilloscope. As for the MSBN (figures 3–5), the measurements are carried out on a circuit
+shown in figure 7(c). T o control the input current, the same current mirror part is used. The input current is
+measured by an ammeter A and the output signals V 1 are collected on the ‘soma’ part by an oscilloscope.
+All the electronic components and instruments used are easy to access. The thyristors used are from
+STMicroelectonics (P0118MA 2AL3). The current mirror are implemented on dual N-channel and dual
+P-channel matched MOSFET pair from advanced linear devices (ALD1105). The power sources Vsupply and
+Vcontrol used for the current mirror are RS Pro RS-3005P and RSDG805 respectively. The multimeter is a
+Mastech MS8217 and the oscilloscope is a PicoScope 2204A.
+10
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+Figure7. The circuits of the measurements. (a) for I–V curve measurement; (b) for simple spiking neuron MSN measurement;
+(c) for bursting neuron MSBN measurement.
+Dataavailabilitystatement
+The data cannot be made publicly available upon publication because they are not available in a format that
+is sufficiently accessible or reusable by other researchers. The data that support the findings of this study are
+available upon reasonable request from the authors.
+Acknowledgments
+W e acknowledge support from the French ANR ‘MoMA ’ project ANR-19-CE30-0020. W e thank C Pasquier
+and P Senzier for providing space and help to set up of our research activity. This work was initiated within
+the framework of the AIST-CNRS-CentraleSupélec Joint Research Agreement ‘Bioinspired electronic
+systems’ .
+ORCIDiD
+Marcelo Rozenberg  https://orcid.org/0000-0001-9161-0370
+References
+[1] Herz A V M, Gollisch T, Machens C K and Jaeger D 2006 Modeling single-neuron dynamics and computations: a balance of detail
+and abstraction Science314 80
+[2] Gerstner W, Kistler W, Naud R and Paninski L 2014 Neuronal Dynamics: From Single Neurons to Networks and Models of Cognition
+(Cambridge University Press)
+[3] Hopfield J J 1982 Neural networks and physical systems with emergent collective computational abilities Proc. Natl Acad. Sci.
+79 2554
+[4] Hodgkin A L and Huxley A F 1952 A quantitative description of membrane current and its application to conduction and
+excitation in nerve J. Physiol.117 500
+[5] Merolla P A, Arthur J V , Alvarez-Icaza R, Cassidy A S, Sawada J, Akopyan F , Jackson B L, Imam N, Guo C and Nakamura Y 2014 A
+million spiking-neuron integrated circuit with a scalable communication network and interface Science345 668
+[6] Thakur C S et al 2018 Large-scale neuromorphic spiking array processors: a quest to mimic the brain Front. Neurosci.12 891
+[7] Stoliar P , T ranchant J, Corraze B, Janod E, Besland M-P , T esler F , Rozenberg M and Cario L 2017 A leaky-integrate-and-fire neuron
+analog realized with a mott insulator Adv. Funct. Mater.27 1604740
+[8] Pickett M D, Medeiros-Ribeiro G and Williams R S 2013 A scalable neuristor built with Mott memristors Nat. Mater.12 114
+11
+Neuromorph. Comput. Eng. 3 (2023) 044008 J Wu et al
+[9] Yi W, T sang K K, Lam S K, Bai X, Crowell J A and Flores E A 2018 Biological plausibility and stochasticity in scalable VO 2 active
+memristor neurons Nat. Commun.9 4661
+[10] Rocco R, del V alle J, Navarro H, Salev P , Schuller I K and Rozenberg M 2022 Exponential escape rate of filamentary incubation in
+mott spiking neurons Phys. Rev. Appl.17 024028
+[11] Izhikevich E M 2000 Neural excitability, spiking and bursting Int. J. Bifurcat. Chaos10 1171
+[12] Ermentrout G and T erman D 2010Mathematical Foundations of Neuroscience, Interdisciplinary Applied Mathematics (Springer)
+[13] Leon Chua V S and Kim H-S 2012 Hodgkin–Huxley axon is made of memristors Int. J. Bifurcat. Chaos22 1230011
+[14] Chua L 2014 If it’s pinched it’s a memristor Semicond. Sci. Technol.29 104001
+[15] del V alle J, Ramírez J G, Rozenberg M J and Schuller I K 2018 Challenges in materials and devices for resistive-switching-based
+neuromorphic computing J. Appl. Phys.124 211101
+[16] Wang R, Y ang J-Q, Mao J-Y , Wang Z-P , Wu S, Zhou M, Chen T, Zhou Y and Han S-T 2020 Recent advances of volatile memristors:
+devices, mechanisms and applications Adv. Intell. Syst.2 2000055
+[17] Y ang K, Joshua Y ang J, Huang R and Y ang Y 2022 Nonlinearity in memristors for neuromorphic dynamic systemsSmall Sci.
+2 2100049
+[18] Hoffmann A et al 2022 Quantum materials for energy-efficient neuromorphic computing: opportunities and challenges APL
+Mater.10 070904
+[19] Wang Y-H, Gong T-C, Ding Y-X, Li Y , Wang W, Chen Z-A, Du N, Covi E, Farronato M and Ielmini D 2022 Redox memristors with
+volatile threshold switching behavior for neuromorphic computing J. Electron. Sci. Technol.20 100177
+[20] Stoliar P , Cario L, Janod E, Corraze B, Guillot-Deudon C, Salmon-Bourmand S, Guiot V , T ranchant J and Rozenberg M 2013
+Universal electric-field-driven resistive transition in narrow-gap Mott insulators Adv. Mater.25 3222
+[21] Del V alle J, Salev P , T esler F , V argas N M, Kalcheim Y , Wang P , T rastoy J, Lee M-H, Kassabian G and Ramírez J G 2019 Subthreshold
+firing in Mott nanodevices Nature569 388
+[22] Sze S M and Ng K K 2006 Physics of Semiconductor Devices 3rd edn (Wiley-Interscience)
+[23] Covi E, Wang W, Lin Y-H, Farronato M, Ambrosi E and Ielmini D 2021 Switching dynamics of Ag-based filamentary volatile
+resistive switching devices-part I: experimental characterization IEEE Trans. Electron Devices68 4335
+[24] Zhou G, Wang Z, Sun B, Zhou F , Sun L, Zhao H, Hu X, Peng X, Y an J and Wang Het al 2022 V olatile and nonvolatile memristive
+devices for neuromorphic computing Adv. Electron. Mater.8 2101127
+[25] Kim H, Mahmoodi M R, Nili H and Strukov D B 2021 4k-memristor analog-grade passive crossbar circuit Nat. Commun.12 5198
+[26] Zahoor F , Azni Zulkifli T Z and Khanday F A 2020 Resistive random access memory (RRAM): an overview of materials, switching
+mechanism, performance, multilevel cell (mlc) storage, modeling and applications Nanoscale Res. Lett.15 90
+[27] Rozenberg M J, Schneegans O and Stoliar P 2019 An ultra-compact leaky-integrate-and-fire model for building spiking neural
+networks Sci. Rep.9 11123
+[28] Stoliar P , Schneegans O and Rozenberg M J 2020 Biologically relevant dynamical behaviors realized in an ultra-compact neuron
+model Front. Neurosci.14 421
+[29] Stoliar P , Schneegans O and Rozenberg M J 2021 A functional spiking neural network of ultra compact neurons Front. Neurosci.
+15 635098
+[30] Ping H and Shepard P 1996 Apamin-sensitive Ca (2 +)-activated K+ channels regulate pacemaker activity in nigral dopamine
+neurons Neuroreport7 809
+[31] Pinsky P F and Rinzel J 1994 Intrinsic and network rhythmogenesis in a reduced traub model for CA3 neurons J. Comput.
+Neurosci.1 39
+[32] T raub R D, W ong R K, Miles R and Michelson H 1991 A model of a CA3 hippocampal pyramidal neuron incorporating
+voltage-clamp data on intrinsic conductances J. Neurophysiol.66 635
+[33] Connors B W and Regehr W G 1996 Neuronal firing: does function follow form? Curr. Biol.6 1560
+[34] Butera Jr R J, Rinzel J and Smith J C 1999 Models of respiratory rhythm generation in the pre-Bötzinger complex. I. Bursting
+pacemaker neurons J. Neurophysiol.82 382
+[35] Kepecs A and Lisman J 2003 Information encoding and computation with spikes and bursts Netw. Comput. Neural Syst.14 103
+[36] Zeldenrust F , Wadman W J and Englitz B 2018 Neural coding with bursts—current state and future perspectives Front. Comput.
+Neurosci.12
+[37] Russell D F and Hartline D K 1978 Bursting neural networks: a reexamination Science200 453
+[38] Beurrier C, Congar P , Bioulac B and Hammond C 1999 Subthalamic nucleus neurons switch from single-spike activity to
+burst-firing mode J. Neurosci.19 599
+[39] Prince D A and W ong R K 1981 Human epileptic neurons studied in vitro Brain Res.210 323
+[40] Y ang Y , Cui Y , Sang K, Dong Y , Ni Z, Ma S and Hu H 2018 Ketamine blocks bursting in the lateral habenula to rapidly relieve
+depression Nature554 317
+[41] Lee E et al 2021 Excitatory synapses and gap junctions cooperate to improve Pv neuronal burst firing and cortical social cognition
+in Shank2-mutant mice Nat. Commun.12 5116
+[42] Das Sharma S et al 2020 Cortical neurons derived from human pluripotent stem cells lacking FMRP display altered spontaneous
+firing patterns Mol. Autism11
+[43] Rubin J E and T erman D 2004 High frequency stimulation of the subthalamic nucleus eliminates pathological thalamic rhythmicity
+in a computational model J. Comput. Neurosci.16 211
+12
