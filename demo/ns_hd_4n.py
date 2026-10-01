@@ -65,7 +65,7 @@ I_MIN, I_MAX = p.operating_window()
 # ── Tonic bias (all subthreshold) ───────────────────────────────────────────
 I0_EB = 24.1e-6                 # 75% of I_min
 I0_GI = 6.1e-6                  # 19% of I_min — GI is driven by the EBs
-I0_PB = 5.0e-6                  # 16% of I_min — low, to leave room for the velocity input
+I0_PB = 2.0e-6                  #  6% of I_min — low: the EB copy and the velocity pulse do the work
 
 # ── Synaptic weights (A) and time constants (s) ─────────────────────────────
 # Tuned against Fig2.1 / Fig2.2 under the constraint that the winner and GI
@@ -74,8 +74,8 @@ I0_PB = 5.0e-6                  # 16% of I_min — low, to leave room for the ve
 W_SELF, TAU_SELF = 2.394e-6, 150e-3    # EB → EB   self-excitation
 W_EBGI, TAU_EBGI = 14.06e-6, 30e-3     # EB → GI
 W_GIEB, TAU_GIEB = 1.503e-6, 100e-3    # GI → EB   global inhibition
-W_COPY, TAU_COPY = 3.43e-6, 100e-3     # EB → PB   position copy (PB follows EB, ~τ later)
-W_SHIFT, TAU_SHIFT = 2.0e-6, 100e-3    # PB → EB   shifted return (too weak to move the bump without velocity input)
+W_COPY, TAU_COPY = 5.34e-6, 100e-3     # EB → PB   position copy (PB follows EB, ~τ later)
+W_SHIFT, TAU_SHIFT = 1.4e-6, 100e-3    # PB → EB   shifted return (moves the bump only with velocity input)
 
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
@@ -420,14 +420,17 @@ def stage_bump():
 # ║ Stage 3 — WTA between every pair of EB neurons                           ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
-# Fig2.1c protocol: 35 µA × 0.5 s pulse every 2.5 s.  The target sequence is an
+# Fig2.1c protocol: 0.5 s pulse every 2.5 s.  The pulse is 30 µA rather than
+# the figure's 35 µA: with the PBs copying the EBs, the pulsed EB also receives
+# PB shift current, and at 35 µA the summed EB → GI drive pushes GI past I_hold.
+# The target sequence is an
 # Euler circuit of the complete directed graph on 4 nodes, so every ordered
 # pair (EBa → EBb) is switched exactly once (12 transitions).
 WTA_SEQ    = [1, 2, 3, 4, 1, 3, 2, 4, 3, 1, 4, 2, 1]       # 1-based EB labels
 WTA_T0     = 0.5        # s, first pulse
 WTA_PERIOD = 2.5        # s
 WTA_DUR    = 0.5        # s
-WTA_I      = 35e-6      # A
+WTA_I      = 30e-6      # A
 
 # Figure targets (µA, Hz) read off Fig2.1c / Fig2.2b
 TARGETS = {
@@ -674,7 +677,7 @@ TURN_SEED   = (0.5, 0.5, 0, 35e-6)        # t0, dur, EB index, amplitude
 TURN_T0     = 3.0        # s, first velocity pulse
 TURN_PERIOD = 2.5        # s
 TURN_DUR    = 0.5        # s
-TURN_I      = 22e-6      # A — I0_PB + TURN_I stays below I_min without the copy
+TURN_I      = 25e-6      # A — I0_PB + TURN_I stays below I_min without the copy
 TURN_SEQ    = ['cw'] * 4 + ['ccw'] * 4
 
 def stage_turn():
