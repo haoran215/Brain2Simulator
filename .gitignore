@@ -229,3 +229,7 @@ wheels/
 # Virtual environments
 .venv
 >>>>>>> ba47d1f (First commit: initial project structure)
+
+data/
+*.h5
+*.h5.gz
